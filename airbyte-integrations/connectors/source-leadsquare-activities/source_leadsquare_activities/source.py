@@ -200,7 +200,6 @@ class SourceLeadsquareActivities(Source):
             )
 
             if 200 <= leadsquare_response.status_code < 300:
-                logger.info(f'LeadSquare Got response with {leadsquare_response.json()["RecordCount"]} Count')
                 for leadsquare_activities in leadsquare_response.json()['ProspectActivities']:
                     lead_activity_data = {
                         "activityId": leadsquare_activities['Id'],
