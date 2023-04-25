@@ -4,7 +4,6 @@
 
 
 import json
-import requests
 from datetime import datetime
 from typing import Dict, Generator
 
@@ -201,6 +200,7 @@ class SourceLeadsquareActivities(Source):
             )
 
             if 200 <= leadsquare_response.status_code < 300:
+                logger.info(f'LeadSquare Got response with {leadsquare_response.json()["RecordCount"]} Count')
                 for leadsquare_activities in leadsquare_response.json()['ProspectActivities']:
                     lead_activity_data = {
                         "activityId": leadsquare_activities['Id'],
@@ -210,9 +210,9 @@ class SourceLeadsquareActivities(Source):
                         "activityType": leadsquare_activities['ActivityType'],
                         "type": leadsquare_activities['Type'],
                         "relatedProspectId": leadsquare_activities['RelatedProspectId'],
-                        "activityData": leadsquare_activities['Data'],
-                        "sessionId": leadsquare_activities['SessionId'],
-                        "activityCustomFields": leadsquare_activities['Fields'],
+                        "activityData": leadsquare_activities.get('Data', {}) if leadsquare_activities.get('Data', {}) else {},
+                        "sessionId": leadsquare_activities.get('SessionId', ''),
+                        "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
                     }
 
                     yield AirbyteMessage(
