@@ -40,10 +40,12 @@ class SourceNaukriJobScrapper(Source):
             searchJobType = config['jobtype']
 
             naukriResponse = requests.get(
-                'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&pageNo=1&src=jobsearchDesk&latLong=', 
-                params={
-                    'keyword': searchJobType,
-                },
+                    'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk', 
+                    params={
+                        'keyword': searchJobType,
+                        'pageNo' : 1,
+                        'jobAge': 1,
+                    },
                 headers={
                     'appid': app_id,
                     'systemid': system_id,
@@ -162,10 +164,11 @@ class SourceNaukriJobScrapper(Source):
 
             for pageNo in range(1,50):
                 naukriResponse = requests.get(
-                    'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk&latLong=', 
+                    'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk', 
                     params={
-                    'keyword': searchJobType,
-                    'pageNo' : pageNo,
+                        'keyword': searchJobType,
+                        'pageNo' : pageNo,
+                        'jobAge': 1,
                     },
                     headers={
                         'appid': app_id,
