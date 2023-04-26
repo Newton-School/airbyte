@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import Dict, Generator
 import requests
+import re
 
 from airbyte_cdk.logger import AirbyteLogger
 from airbyte_cdk.models import (
@@ -108,9 +109,13 @@ class SourceNaukriJobScrapper(Source):
             "salary": {
                 "type": "string"
             },
-            "skills": {
+            "skills_raw": {
                 "type": "string"
             },
+            "companyId": {
+                "type": "string"
+            },
+
         }
 
         stream_name = "NaukriJobs"
@@ -132,6 +137,11 @@ class SourceNaukriJobScrapper(Source):
         ]
 
         return AirbyteCatalog(streams=streams)
+
+    @staticmethod
+    def remove_html_tags(text):
+        clean = re.compile('<.*?>')
+        return re.sub(clean, ' ', text)
 
     def read(
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
@@ -180,11 +190,12 @@ class SourceNaukriJobScrapper(Source):
                             'jobId': jobObj['jobId'].strip(),
                             'title': jobObj['title'].strip(),
                             'jdUrl': "https://www.naukri.com"+jobObj['jdURL'].strip(),
-                            'skills': jobObj['tagsAndSkills'].strip(),
+                            'skills_raw': jobObj['tagsAndSkills'].strip(),
                             'companyName':jobObj['companyName'].strip(),
-                            'jdText':jobObj['jobDescription'].strip(),
+                            'jdText': self.remove_html_tags(jobObj['jobDescription'].strip()),
                             'jobType': 'Not available',
-                            'role': 'frontenddeveloper',
+                            'role': searchJobType,
+                            'companyId': jobObj['companyId'].strip(),
                         }
                         otherData = {}
                         for placeholderObj in jobObj['placeholders']:
