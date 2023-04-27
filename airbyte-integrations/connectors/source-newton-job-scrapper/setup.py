@@ -15,7 +15,7 @@ TEST_REQUIREMENTS = [
 ]
 
 setup(
-    name="source_naukri_job_scrapper",
+    name="source_newton_job_scrapper",
     description="Source implementation for Naukri Job Scrapper.",
     author="Airbyte",
     author_email="contact@airbyte.io",
