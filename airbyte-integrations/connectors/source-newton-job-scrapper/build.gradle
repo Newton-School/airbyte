@@ -5,5 +5,5 @@ plugins {
 }
 
 airbytePython {
-    moduleDirectory 'source_naukri_job_scrapper_singer'
+    moduleDirectory 'source_newton_job_scrapper_singer'
 }

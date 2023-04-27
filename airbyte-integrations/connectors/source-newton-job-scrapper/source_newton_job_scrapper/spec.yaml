@@ -8,12 +8,6 @@ connectionSpecification:
     - systemid
     - jobtype
   properties:
-    appid:
-      type: string
-      description: app id
-    systemid:
-      type: string
-      description: system id
     jobtype:
       type: string
       description: job type

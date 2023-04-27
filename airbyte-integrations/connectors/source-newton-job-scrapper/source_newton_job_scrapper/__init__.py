@@ -3,6 +3,6 @@
 #
 
 
-from .source import SourceNaukriJobScrapper
+from .source import SourceJobScrapper
 
-__all__ = ["SourceNaukriJobScrapper"]
+__all__ = ["SourceJobScrapper"]

@@ -22,7 +22,7 @@ from airbyte_cdk.models import (
 from airbyte_cdk.sources import Source
 
 
-class SourceNaukriJobScrapper(Source):
+class SourceJobScrapper(Source):
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the integration
@@ -87,72 +87,4 @@ class SourceNaukriJobScrapper(Source):
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
 
-        stream_name = "NaukriJobs"
-        try:
-            app_id = config['appid']
-            system_id = config['systemid']
-            searchJobType = config['jobtype']
 
-            for pageNo in range(1, 50):
-                naukriResponse = requests.get(
-                    'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk', 
-                    params={
-                        'keyword': searchJobType,
-                        'pageNo' : pageNo,
-                        'jobAge': 1,
-                    },
-                    headers={
-                        'appid': app_id,
-                        'systemid': system_id,
-                    })
-                if 200 <= naukriResponse.status_code < 300:
-                    for jobObj in naukriResponse.json()['jobDetails']:
-                        jobData = {
-                            'jobId': jobObj['jobId'].strip(),
-                            'title': jobObj['title'].strip(),
-                            'jdUrl': "https://www.naukri.com"+jobObj['jdURL'].strip(),
-                            'companyName':jobObj['companyName'].strip(),
-                            'jdText': self.remove_html_tags(jobObj['jobDescription'].strip()),
-                            'jobType': 'Not available',
-                            'role': searchJobType,
-                            'companyId': jobObj['companyId'].strip(),
-                        }
-
-                        internal_response = requests.get(
-                            'https://www.naukri.com/jobapi/v4/job/'+jobObj['jobId'],
-                            headers={
-                                'appid': app_id,
-                                'systemid': system_id,
-                            })
-                        internalObj = internal_response.json()['jobDetails'] 
-
-                        internalData = {
-                            'skills': {
-                                'preferredSkills': self.get_labels(internalObj['keySkills']['preferred']),
-                                'otherSkills' : self.get_labels(internalObj['keySkills']['other']),  
-                            },
-                            'department': internalObj['functionalArea'],
-                            'employmentType': internalObj['employmentType'],
-                            'relevancy' : True if internalObj['maximumExperience'] <= 1 or internalObj['minimumExperience'] <= 1 else False,
-                            'salary' : internalObj['salaryDetail']['label'],
-                            'extraDetails': internalObj,
-                            'minimumExperience': internalObj['minimumExperience'],
-                            'maximumExperience': internalObj['maximumExperience'],
-                            'withoutJobId' : self.updated_url(f"https://www.naukri.com{jobObj['jdURL']}", f"-{jobObj['jobId']}")
-                        }
-
-                        for placeholderObj in jobObj['placeholders']:
-                            if(placeholderObj['type'] == 'location') :
-                                internalData['location'] = placeholderObj['label'].strip()
-                        
-                        jobData.update(internalData)
-
-                        yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(stream=stream_name, data=jobData, emitted_at=int(datetime.now().timestamp()) * 1000),
-                        )
-                else:
-                    logger.error(f'LeadSquare Response Threw {naukriResponse.status_code} with {naukriResponse.status_code}')
-
-        except Exception as e:
-            logger.error(f'Error while running query: {str(e)}')
