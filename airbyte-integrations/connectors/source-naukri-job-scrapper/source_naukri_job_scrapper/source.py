@@ -109,7 +109,19 @@ class SourceNaukriJobScrapper(Source):
             "salary": {
                 "type": "string"
             },
-            "skills_raw": {
+            "skills": {
+                "type": "object"
+            },
+            "department": {
+                "type": "string"
+            },
+            "employmentType": {
+                "type": "string"
+            },
+            "relevancy": {
+                "type": "boolean"
+            },
+            "extraDetails": {
                 "type": "string"
             },
             "companyId": {
@@ -142,6 +154,18 @@ class SourceNaukriJobScrapper(Source):
     def remove_html_tags(text):
         clean = re.compile('<.*?>')
         return re.sub(clean, ' ', text)
+    
+    @staticmethod
+    def get_labels(my_list):
+        labels = []
+        for item in my_list:
+            labels.append(item["label"])
+        return labels
+    
+    @staticmethod
+    def updated_url(original_string,string_to_remove):
+        updated_string = original_string.replace(string_to_remove, "")
+        return updated_string
 
     def read(
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
@@ -190,25 +214,41 @@ class SourceNaukriJobScrapper(Source):
                             'jobId': jobObj['jobId'].strip(),
                             'title': jobObj['title'].strip(),
                             'jdUrl': "https://www.naukri.com"+jobObj['jdURL'].strip(),
-                            'skills_raw': jobObj['tagsAndSkills'].strip(),
                             'companyName':jobObj['companyName'].strip(),
                             'jdText': self.remove_html_tags(jobObj['jobDescription'].strip()),
                             'jobType': 'Not available',
                             'role': searchJobType,
                             'companyId': jobObj['companyId'].strip(),
                         }
-                        otherData = {}
-                        for placeholderObj in jobObj['placeholders']:
-                            if(placeholderObj['type'] == 'experience'):
-                                otherData['experience'] = placeholderObj['label'].strip()
-                            
-                            if(placeholderObj['type'] == 'salary'):
-                                otherData['salary'] = placeholderObj['label'].strip()
 
+                        internal_response = requests.get(
+                            'https://www.naukri.com/jobapi/v4/job/'+jobObj['jobId'],
+                            headers={
+                                'appid': app_id,
+                                'systemid': system_id,
+                            })
+                        internalObj = internal_response.json()['jobDetails'] 
+
+                        internalData = {
+                            'skills': {
+                                'preferredSkills': self.get_labels(internalObj['keySkills']['preferred']),
+                                'otherSkills' : self.get_labels(internalObj['keySkills']['other']),  
+                            },
+                            'department': internalObj['functionalArea'],
+                            'employmentType': internalObj['employmentType'],
+                            'relevancy' : True if internalObj['maximumExperience'] <= 1 or internalObj['minimumExperience'] <= 1 else False,
+                            'salary' : internalObj['salaryDetail']['label'],
+                            'extraDetails': internalObj,
+                            'minimumExperience': internalObj['minimumExperience'],
+                            'maximumExperience': internalObj['maximumExperience'],
+                            'withoutJobId' : self.updated_url(f"https://www.naukri.com{jobObj['jdURL']}", f"-{jobObj['jobId']}")
+                        }
+
+                        for placeholderObj in jobObj['placeholders']:
                             if(placeholderObj['type'] == 'location') :
-                                otherData['location'] = placeholderObj['label'].strip()
+                                internalData['location'] = placeholderObj['label'].strip()
                         
-                        jobData.update(otherData)
+                        jobData.update(internalData)
 
                         yield AirbyteMessage(
                             type=Type.RECORD,
