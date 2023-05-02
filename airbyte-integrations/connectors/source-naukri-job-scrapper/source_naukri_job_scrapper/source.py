@@ -157,7 +157,7 @@ class SourceNaukriJobScrapper(Source):
                     },
                     'department': extended_job_details['functionalArea'],
                     'job_type': extended_job_details['employmentType'],
-                    'relevancy': True if extended_job_details['minimumExperience'] in [0, 1] else False,
+                    'relevancy_score': True if extended_job_details['minimumExperience'] in [0, 1] else False,
                     'salary': extended_job_details['salaryDetail']['label'],
                     'raw_response': extended_job_details,
                     'min_experience': extended_job_details['minimumExperience'],
