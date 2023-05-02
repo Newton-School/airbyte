@@ -4,10 +4,8 @@ connectionSpecification:
   title: Naukri Job Scrapper Spec
   type: object
   required:
-    - appid
-    - systemid
-    - jobtype
+    - fix-me
   properties:
-    jobtype:
+    fix-me:
       type: string
-      description: job type
+      description: describe me

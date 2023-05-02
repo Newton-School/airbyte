@@ -6,8 +6,8 @@
 import sys
 
 from airbyte_cdk.entrypoint import launch
-from source_newton_job_scrapper import SourceJobScrapper
+from source_naukri_job_scrapper import SourceNaukriJobScrapper
 
 if __name__ == "__main__":
-    source = SourceJobScrapper()
+    source = SourceNaukriJobScrapper()
     launch(source, sys.argv[1:])

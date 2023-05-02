@@ -15,10 +15,10 @@ TEST_REQUIREMENTS = [
 ]
 
 setup(
-    name="source_newton_job_scrapper",
-    description="Source implementation for Job Scrapping.",
-    author="Newton School",
-    author_email="surendra.puri@newtonschool.co",
+    name="source_naukri_job_scrapper",
+    description="Source implementation for Naukri Job Scrapper.",
+    author="Airbyte",
+    author_email="contact@airbyte.io",
     packages=find_packages(),
     install_requires=MAIN_REQUIREMENTS,
     package_data={"": ["*.json", "*.yaml"]},

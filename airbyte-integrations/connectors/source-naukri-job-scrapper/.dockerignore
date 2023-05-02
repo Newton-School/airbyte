@@ -1,6 +1,6 @@
 *
 !Dockerfile
 !main.py
-!source_newton_job_scrapper
+!source_naukri_job_scrapper
 !setup.py
 !secrets

@@ -5,9 +5,9 @@
 
 import json
 from datetime import datetime
-from typing import Dict, Generator
 import requests
 import re
+from typing import Dict, Generator
 
 from airbyte_cdk.logger import AirbyteLogger
 from airbyte_cdk.models import (
@@ -15,6 +15,7 @@ from airbyte_cdk.models import (
     AirbyteConnectionStatus,
     AirbyteMessage,
     AirbyteRecordMessage,
+    AirbyteStream,
     ConfiguredAirbyteCatalog,
     Status,
     Type,
@@ -41,112 +42,31 @@ class SourceNaukriJobScrapper(Source):
             searchJobType = config['jobtype']
 
             naukriResponse = requests.get(
-                    'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk', 
-                    params={
-                        'keyword': searchJobType,
-                        'pageNo' : 1,
-                        'jobAge': 1,
-                    },
+
+                'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk',
+                params={
+                    'keyword': searchJobType,
+                    'pageNo': 1,
+                    'jobAge': 1,
+                },
                 headers={
                     'appid': app_id,
                     'systemid': system_id,
                 }
             )
-  
+
             if 200 <= naukriResponse.status_code < 300:
                 return AirbyteConnectionStatus(status=Status.SUCCEEDED)
 
-            return AirbyteConnectionStatus(status=Status.FAILED, message=f"Threw {naukriResponse.status_code} Status code, with {naukriResponse.json()} response.")
+            return AirbyteConnectionStatus(status=Status.FAILED,
+                                           message=f"Threw {naukriResponse.status_code} Status code, with {naukriResponse.json()} response.")
         except Exception as e:
             return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {str(e)}")
 
     def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
-        """
-        Returns an AirbyteCatalog representing the available streams and fields in this integration.
-        For example, given valid credentials to a Postgres database,
-        returns an Airbyte catalog where each postgres table is a stream, and each table column is a field.
 
-        :param logger: Logging object to display debug/info/error to the logs
-            (logs will not be accessible via airbyte UI if they are not passed to this logger)
-        :param config: Json object containing the configuration of this source, content of this json is as specified in
-        the properties of the spec.yaml file
-
-        :return: AirbyteCatalog is an object describing a list of all available streams in this source.
-            A stream is an AirbyteStream object that includes:
-            - its stream name (or table name in the case of Postgres)
-            - json_schema providing the specifications of expected schema for this stream (a list of columns described
-            by their names and types)
-        """
-
-        fields = {
-            "jobType": {
-                "type": "string"
-            },
-            "title": {
-                "type": "string"
-            },
-            "role": {
-                "type": "string"
-            },
-            "jobId": {
-                "type": "number"
-            },
-            "jdUrl": {
-                "type": "string"
-            },
-            "jdText": {
-                "type": "string"
-            },
-            "experience": {
-                "type": "string"
-            },
-            "companyName": {
-                "type": "string"
-            },
-            "location": {
-                "type": "string"
-            },
-            "salary": {
-                "type": "string"
-            },
-            "skills": {
-                "type": "object"
-            },
-            "department": {
-                "type": "string"
-            },
-            "employmentType": {
-                "type": "string"
-            },
-            "relevancy": {
-                "type": "boolean"
-            },
-            "extraDetails": {
-                "type": "string"
-            },
-            "companyId": {
-                "type": "string"
-            },
-
-        }
-
-        stream_name = "NaukriJobs"
-        json_schema = {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "properties": fields,
-        }
-
-        streams = [
-            {
-                "name": stream_name,
-                "supported_sync_modes": [
-                    "full_refresh"
-                ],
-                "source_defined_cursor": False,
-                "json_schema": json_schema
-            }
-        ]
+        with open('streams_schema.json', 'r') as f:
+            streams = json.load(f)
 
         return AirbyteCatalog(streams=streams)
 
@@ -154,7 +74,7 @@ class SourceNaukriJobScrapper(Source):
     def remove_html_tags(text):
         clean = re.compile('<.*?>')
         return re.sub(clean, ' ', text)
-    
+
     @staticmethod
     def get_labels(my_list):
         labels = []
@@ -163,7 +83,7 @@ class SourceNaukriJobScrapper(Source):
         return labels
     
     @staticmethod
-    def updated_url(original_string,string_to_remove):
+    def updated_url(original_string, string_to_remove):
         updated_string = original_string.replace(string_to_remove, "")
         return updated_string
 
@@ -221,6 +141,7 @@ class SourceNaukriJobScrapper(Source):
                             'appid': app_id,
                             'systemid': system_id,
                         })
+
                     for jobObj in naukriResponse.json()['jobDetails']:
                         jobData = {
                             'jobId': jobObj['jobId'].strip(),
@@ -268,10 +189,6 @@ class SourceNaukriJobScrapper(Source):
                         )
             else:
                 logger.error(f'LeadSquare Response Threw {naukriResponse.status_code} with {naukriResponse.status_code}')
-
-
-
-
 
         except Exception as e:
             logger.error(f'Error while running query: {str(e)}')
