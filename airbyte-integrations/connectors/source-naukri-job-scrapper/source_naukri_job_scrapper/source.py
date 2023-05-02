@@ -25,6 +25,7 @@ from airbyte_cdk.sources import Source
 app_id = 110
 system_id = 110
 
+
 class SourceNaukriJobScrapper(Source):
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
@@ -110,28 +111,28 @@ class SourceNaukriJobScrapper(Source):
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
 
-        job_type = config['jobtype']
+        job_role = config['job_role']
 
-        job_role_data = {'title': job_type}
+        job_role_data = {'title': job_role}
         yield AirbyteMessage(
             type=Type.RECORD,
             record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
         )
 
-        response_for_pages = self.get_naukri_request_response(job_type)
+        response_for_pages = self.get_naukri_request_response(job_role)
         if 'noOfJobs' in response_for_pages:
             total_pages = response_for_pages['noOfJobs'] // 30
         else:
             total_pages = 1
 
         for page in range(1, total_pages):
-            response_for_job = self.get_naukri_request_response(job_type, page)
+            response_for_job = self.get_naukri_request_response(job_role, page)
 
             for job_resp in response_for_job.json()['jobDetails']:
                 company_data = {"name": job_resp['companyName'].strip()}
                 yield AirbyteMessage(
                     type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    record=AirbyteRecordMessage(stream='companies', data=company_data, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
 
                 jd_url = "https://www.naukri.com" + job_resp.get('jdURL', '')
