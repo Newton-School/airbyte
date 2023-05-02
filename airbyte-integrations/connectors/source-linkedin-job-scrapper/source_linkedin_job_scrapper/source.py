@@ -291,6 +291,7 @@ class SourceLinkedinJobScrapper(Source):
                 try:
                     people_details = self.search_people_from_company(company_url, keyword)
                     people_details['company'] = company_name
+                    people_details['keyword'] = keyword
                     yield AirbyteMessage(
                         type=Type.RECORD,
                         record=AirbyteRecordMessage(stream='recruiter_details', data=people_details,
