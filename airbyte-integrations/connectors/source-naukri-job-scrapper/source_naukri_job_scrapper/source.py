@@ -22,8 +22,8 @@ from airbyte_cdk.models import (
 )
 from airbyte_cdk.sources import Source
 
-app_id = 110
-system_id = 110
+app_id = "110"
+system_id = "110"
 
 
 class SourceNaukriJobScrapper(Source):
@@ -40,9 +40,7 @@ class SourceNaukriJobScrapper(Source):
         :return: AirbyteConnectionStatus indicating a Success or Failure
         """
         try:
-            app_id = config['appid']
-            system_id = config['systemid']
-            searchJobType = config['jobtype']
+            searchJobType = config['job_role']
 
             naukriResponse = requests.get(
 
@@ -67,11 +65,9 @@ class SourceNaukriJobScrapper(Source):
             return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {str(e)}")
 
     def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
+        from .streams_schema import stream_schema
 
-        with open('streams_schema.json', 'r') as f:
-            streams = json.load(f)
-
-        return AirbyteCatalog(streams=streams)
+        return AirbyteCatalog(streams=stream_schema)
 
     @staticmethod
     def remove_html_tags(text):
@@ -128,7 +124,7 @@ class SourceNaukriJobScrapper(Source):
         for page in range(1, total_pages):
             response_for_job = self.get_naukri_request_response(job_role, page)
 
-            for job_resp in response_for_job.json()['jobDetails']:
+            for job_resp in response_for_job['jobDetails']:
                 company_data = {"name": job_resp['companyName'].strip()}
                 yield AirbyteMessage(
                     type=Type.RECORD,
@@ -147,7 +143,7 @@ class SourceNaukriJobScrapper(Source):
                 }
 
                 job_extended_response = requests.get(
-                    'https://www.naukri.com/jobapi/v4/job/' + job_data['jobId'],
+                    'https://www.naukri.com/jobapi/v4/job/' + job_resp.get('jobId', ''),
                     headers={
                         'appid': app_id,
                         'systemid': system_id,

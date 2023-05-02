@@ -4,8 +4,8 @@ connectionSpecification:
   title: Naukri Job Scrapper Spec
   type: object
   required:
-    - fix-me
+    - job_role
   properties:
-    fix-me:
+    job_role:
       type: string
-      description: describe me
+      description: Job Role to Search in Naukri.com
