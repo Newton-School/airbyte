@@ -221,7 +221,8 @@ class SourceLinkedinJobScrapper(Source):
             record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
         )
 
-        for jd_link in self.get_all_jobs_jd_links(job_role=job_role):
+        jd_links = self.get_all_jobs_jd_links(job_role=job_role)
+        for jd_link in jd_links:
             job_details = {
                 'job_description_url': jd_link,
                 'job_description_url_without_job_id': jd_link,
@@ -289,8 +290,12 @@ class SourceLinkedinJobScrapper(Source):
                     record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
 
-        self.login_to_linkedin(username=config['username'], password=config['password'])
-        keywords = ['IT%20Recruiter%20India', 'Human%20Resources%20India']
+        time.sleep(5)
+        try:
+            self.login_to_linkedin(username=config['username'], password=config['password'])
+            keywords = ['IT%20Recruiter%20India', 'Human%20Resources%20India']
+        except:
+            return
         for company_url, company_name in company_urls.items():
             for keyword in keywords:
                 try:
