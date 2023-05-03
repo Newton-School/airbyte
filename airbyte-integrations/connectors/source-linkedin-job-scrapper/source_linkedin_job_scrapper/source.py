@@ -28,12 +28,28 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from datetime import datetime
 chrome_options = webdriver.ChromeOptions()
+# chrome_options.binary_location = '/usr/bin/chromium-browser' # This is the default path for the Chromium executable in Alpine
 chrome_options.add_argument('--no-sandbox')
 chrome_options.add_argument('--window-size=1920,1080')
 chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-gpu')
 
-driver = webdriver.Chrome(options=chrome_options)
+import subprocess
+
+commands = ['apk add chromium', 'which chromium']
+for command in commands:
+    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print(result)
+    if result.returncode == 0:
+        # Command executed successfully
+        output = result.stdout.decode('utf-8')
+        print(output)
+    else:
+        # Command failed
+        error = result.stderr.decode('utf-8')
+        print(error)
+
+#driver = webdriver.Chrome(options=chrome_options, executable_path='/usr/lib/chromium/chromedriver')
 job_type_keys = {
     "full_time": "F",
     "part_time": "P"

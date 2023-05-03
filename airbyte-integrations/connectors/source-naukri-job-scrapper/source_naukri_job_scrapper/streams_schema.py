@@ -34,8 +34,11 @@ stream_schema = [{
             "max_experience": {
                 "type": "number"
             },
-            "salary": {
-                "type": "string"
+            "min_ctc": {
+                "type": "number"
+            },
+            "max_ctc": {
+                "type": "number"
             },
             "job_location": {
                 "type": "string"
