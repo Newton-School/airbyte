@@ -4,6 +4,7 @@
 
 
 import json
+import os
 from typing import Dict, Generator
 
 from airbyte_cdk.logger import AirbyteLogger
@@ -28,12 +29,17 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from datetime import datetime
 chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument('--no-sandbox')
+chrome_options.binary_location = os.getenv("CHROME_BIN")
 chrome_options.add_argument('--window-size=1920,1080')
-chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument('--disable-browser-side-navigation')
+chrome_options.add_argument('--disable-infobars')
+chrome_options.add_argument('--disable-extensions')
 
-driver = webdriver.Chrome(options=chrome_options)
+driver = webdriver.Chrome(executable_path=os.getenv("CHROME_DRIVER_PATH"), options=chrome_options)
 job_type_keys = {
     "full_time": "F",
     "part_time": "P"
@@ -73,10 +79,9 @@ class SourceLinkedinJobScrapper(Source):
 
     def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
 
-        with open('streams_schema.json', 'r') as f:
-            streams = json.load(f)
+        from .streams_schema import stream_schema
 
-        return AirbyteCatalog(streams=streams)
+        return AirbyteCatalog(streams=stream_schema)
 
     @staticmethod
     def create_soup(url):
@@ -133,7 +138,7 @@ class SourceLinkedinJobScrapper(Source):
         return int(int(numeric_part) / denominator)
 
     @staticmethod
-    def login_to_linkedin(username="suvojit.das@newtonschool.co", password="Suvojit@1998"):
+    def login_to_linkedin(username, password):
         driver.get("https://www.linkedin.com/login")
         driver.find_element("xpath", """//*[@id="username"]""").send_keys(username)
         driver.find_element("xpath", """//*[@id="password"]""").send_keys(password)
@@ -284,7 +289,7 @@ class SourceLinkedinJobScrapper(Source):
                     record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
 
-        self.login_to_linkedin()
+        self.login_to_linkedin(username=config['username'], password=config['password'])
         keywords = ['IT%20Recruiter%20India', 'Human%20Resources%20India']
         for company_url, company_name in company_urls.items():
             for keyword in keywords:

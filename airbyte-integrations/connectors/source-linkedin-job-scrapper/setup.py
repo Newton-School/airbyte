@@ -7,6 +7,8 @@ from setuptools import find_packages, setup
 
 MAIN_REQUIREMENTS = [
     "airbyte-cdk~=0.2",
+    "bs4~=0.0.1",
+    "selenium~=4.9.0",
 ]
 
 TEST_REQUIREMENTS = [

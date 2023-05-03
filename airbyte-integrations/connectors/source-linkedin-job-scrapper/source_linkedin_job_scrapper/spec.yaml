@@ -4,8 +4,16 @@ connectionSpecification:
   title: Linkedin Job Scrapper Spec
   type: object
   required:
-    - fix-me
+    - username
+    - password
+    - job_role
   properties:
-    fix-me:
+    username:
       type: string
-      description: describe me
+      description: username for linkedin profile to check
+    password:
+      type: string
+      description: password for linkedin profile
+    job_role:
+      type: string
+      description: job role for searching
