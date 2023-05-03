@@ -103,6 +103,36 @@ class SourceNaukriJobScrapper(Source):
             return naukri_response.json()
         return {}
 
+    @staticmethod
+    def extract_min_max_ctc(salary):
+        min_ctc = 0
+        max_ctc = 0
+        if 'Lacs' in salary and '-' in salary:
+            min_ctc, max_ctc = salary.split(" ")[0].split("-")
+            min_ctc = min_ctc.replace(',', '')
+            min_ctc = float(re.findall(r"[-+]?\d*\.\d+|\d+", min_ctc)[0])
+            max_ctc = float(max_ctc)
+        return {
+            'min_ctc': min_ctc,
+            'max_ctc': max_ctc
+        }
+
+    @staticmethod
+    def get_relevancy_score(min_ctc, min_experience, department, skills):
+        is_relevant = True
+        if min_experience not in [0, 1, 2]:
+            is_relevant = False
+        if min_ctc < 3:
+            is_relevant = False
+        non_preferred_departments = ['sales', 'retail', 'business development', 'recruitment', 'administration', 'manufacturing',
+                                     'finance', 'audit']
+        for dept in non_preferred_departments:
+            if dept in department.lower():
+                is_relevant = False
+        if is_relevant:
+            return 1
+        return 0
+
     def read(
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
@@ -150,6 +180,9 @@ class SourceNaukriJobScrapper(Source):
                     })
                 extended_job_details = job_extended_response.json()['jobDetails']
 
+                salary = self.extract_min_max_ctc(extended_job_details['salaryDetail']['label'])
+                min_ctc = salary['min_ctc']
+                max_ctc = salary['max_ctc']
                 job_extended_data = {
                     'skills': {
                         'preferredSkills': self.get_labels(extended_job_details['keySkills']['preferred']),
@@ -157,8 +190,12 @@ class SourceNaukriJobScrapper(Source):
                     },
                     'department': extended_job_details['functionalArea'],
                     'job_type': extended_job_details['employmentType'],
-                    'relevancy': True if extended_job_details['minimumExperience'] in [0, 1] else False,
-                    'salary': extended_job_details['salaryDetail']['label'],
+                    'min_ctc': min_ctc,
+                    'max_ctc': max_ctc,
+                    'relevancy_score': self.get_relevancy_score(
+                        min_ctc, extended_job_details['minimumExperience'], extended_job_details['functionalArea'],
+                        self.get_labels(extended_job_details['keySkills']['preferred'])
+                    ),
                     'raw_response': extended_job_details,
                     'min_experience': extended_job_details['minimumExperience'],
                     'max_experience': extended_job_details['maximumExperience']

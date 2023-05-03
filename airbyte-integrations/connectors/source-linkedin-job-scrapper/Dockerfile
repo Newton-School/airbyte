@@ -4,6 +4,8 @@ FROM python:3.9-alpine as base
 FROM base as builder
 WORKDIR /airbyte/integration_code
 
+RUN apk add --no-cache chromium
+
 # upgrade pip to the latest version
 RUN apk upgrade \
     && pip install --upgrade pip \
