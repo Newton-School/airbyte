@@ -4,8 +4,9 @@
 
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Generator
+import time
 
 from airbyte_cdk.logger import AirbyteLogger
 from airbyte_cdk.models import (
@@ -26,53 +27,50 @@ class SourceLeadsquareLeads(Source):
 
     required_fields = [
         "ProspectId", 
-        "Bucket", 
-        "City", 
-        "CollegeCity", 
-        "CollegeName",
+        "mx_Bucket", 
+        "mx_City", 
+        "mx_College_City", 
+        "mx_College_Name",
         "CreatedBy",
         "CreatedOn",
-        "CurrentInterestedCourse",
-        "DateOfBirth",
-        "Email",
+        "mx_Current_Interested_Course",
+        "mx_Date_Of_Birth",
+        "EmailAddress",
         "FirstName",
-        "GraduationYear",
-        "HighestQualification",
-        "LastActivity",
-        "LastActivityDate",
-        "LastCallConnectionStatus",
-        "LastCallStatus",
-        "LastCallSubStatus",
+        "mx_Graduation_Year",
+        "mx_Highest_Qualification",
+        "mx_Last_Call_Connection_Status",
+        "mx_Last_Call_Status",
+        "mx_Last_Call_Sub_Status",
         "LastName",
         "LeadAge",
-        "LeadName",
         "LeadNumber",
-        "LeadOrigin",
-        "LeadOwner",
-        "LeadQuality",
-        "LeadScore",
-        "LeadStage",
-        "LeadStatus",
-        "LeadSubStatus",
-        "MidFunnelBuckets",
-        "MidFunnelCount",
+        "Origin",
+        "mx_Lead_Owner",
+        "QualityScore01",
+        "Score",
+        "ProspectStage",
+        "mx_status",
+        "mx_Substatus",
+        "mx_Mid_Funnel_Buckets",
+        "mx_Mid_Funnel_Count",
         "ModifiedOn",
-        "NetworkId",
-        "Owner",
-        "PriorityStatus",
-        "ProductGraduationWar"
+        "mx_Network_Id",
+        "OwnerIdName",
+        "mx_Priority_Status",
+        "mx_Product_Graduation_Year"
         "ProspectId",
-        "ReactivationBucket",
-        "ReactivationDate",
-        "SourceIntendedCourse",
-        "SquadstackCalling",
-        "SquadstackQualificationStatus",
-        "UTMCampaign",
-        "UTMMedium",
-        "UTMReferer",
-        "UTMSource",
-        "WorkExperience",
-        "YearOfPassingInText", 
+        "mx_Reactivation_Bucket",
+        "mx_Reactivation_Date",
+        "mx_Source_Intended_Course",
+        "mx_Squadstack_Calling",
+        "mx_Squadstack_Qualification_Status",
+        "mx_UTM_Campaign",
+        "mx_UTM_Medium",
+        "mx_UTM_Referer",
+        "mx_UTM_Source",
+        "mx_Work_Experience",
+        "mx_Year_of_Passing_in_Text", 
     ]
 
     def get_stream_fields(self):
@@ -102,23 +100,22 @@ class SourceLeadsquareLeads(Source):
 
             current_datetime = datetime.now()
 
-            current_start_hour_timestamp = current_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
-            current_end_hour_timestamp = current_datetime.replace(hour=23, minute=59, second=59, microsecond=999)
+            current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(days=1)
+            current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(days=1)
 
             leadsquare_response = requests.post(
-                url=f'{request_host}/v2/LeadManagement.svc/Leads.RecentlyModified?',
+                url=f'{request_host}/v2/LeadManagement.svc/Leads.Get?',
                 params={
                     "accessKey": access_key,
                     "secretKey": secret_key,
                 },
                 json={
-                    "Parameter": {
-                        "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                        "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    },
                     "Paging": {
                         "PageIndex": 1,
                         "PageSize": 1
+                    },
+                    "Columns": {
+                        "Include_CSV": ','.join(self.required_fields)
                     },
                     "Sorting": {
                         "ColumnName": "CreatedOn",
@@ -153,7 +150,7 @@ class SourceLeadsquareLeads(Source):
             by their names and types)
         """
 
-        stream_name = "LeadSquareLead"
+        stream_name = "LeadSquareLeadsData"
         json_schema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
@@ -196,51 +193,56 @@ class SourceLeadsquareLeads(Source):
 
         :return: A generator that produces a stream of AirbyteRecordMessage contained in AirbyteMessage object.
         """
-        stream_name = "LeadSquareLeads"
+        stream_name = "LeadSquareLeadsData"
         request_host = config['leadsquare-host']
         access_key = config['leadsquare-access-key']
         secret_key = config['leadsquare-secret-key']
 
         current_datetime = datetime.now()
 
-        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
-        current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999)
-
         try:
-            leadsquare_response = requests.post(
-                url=f'{request_host}/v2/LeadManagement.svc/Leads.RecentlyModified',
-                params={
-                    "accessKey": access_key,
-                    "secretKey": secret_key,
-                },
-                json={
-                    "Parameter": {
-                        "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                        "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            page_index = 1
+            while True:
+                leadsquare_response = requests.post(
+                    url=f'{request_host}/v2/LeadManagement.svc/Leads.Get',
+                    params={
+                        "accessKey": access_key,
+                        "secretKey": secret_key,
                     },
-                    "Columns": {
-                        "Include_CSV": ','.join(self.get_stream_fields)
-                    },
-                    "Sorting": {
-                        "ColumnName": "CreatedOn",
-                        "Direction": 1
+                    json={
+                        "Paging": {
+                            "PageIndex": page_index,
+                            "PageSize": 10000
+                        },
+                        "Columns": {
+                            "Include_CSV": ','.join(self.required_fields)
+                        },
+                        "Sorting": {
+                            "ColumnName": "CreatedOn",
+                            "Direction": 1
+                        }
                     }
-                }
-            )
+                )
 
-            if 200 <= leadsquare_response.status_code < 300:
-                for leadsquare_leads in leadsquare_response.json()['Leads']:
-                    lead_data = {}
+                if 200 <= leadsquare_response.status_code < 300:
 
-                    for lead_property in leadsquare_leads["LeadPropertyList"]:
-                        if lead_property["Attribute"] in self.get_stream_fields:
-                            lead_data[lead_property["Attribute"]] = lead_property["Value"]
+                    if len(leadsquare_response.json()) == 0:
+                        break
 
-                    yield AirbyteMessage(
-                        type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream=stream_name, data=lead_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                    )
-            else:
-                logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
+                    for leadsquare_leads in leadsquare_response.json():
+                        lead_data = {}
+                        for lead_property in self.required_fields:
+                            lead_data[lead_property] = leadsquare_leads.get(lead_property,"")
+
+                        yield AirbyteMessage(
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(stream=stream_name, data=lead_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        )
+                else:
+                    logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
+                    break
+                time.sleep(5)
+                page_index += 1
+                
         except Exception as e:
             logger.error(f'Error while running activity query: {str(e)}')
