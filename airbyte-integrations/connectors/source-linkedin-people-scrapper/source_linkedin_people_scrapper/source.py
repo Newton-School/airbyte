@@ -222,7 +222,7 @@ class SourceLinkedinPeopleScrapper(Source):
         """
         company_urls = self.get_company_urls(config['db_host'], config['db_password'])
 
-        self.login_to_linkedin(username=config['username'], password=config['password'])
+        self.login_to_linkedin(username=config['linkedin_username'], password=config['linkedin_password'])
 
         keywords = ['IT%20Recruiter%20India', 'Human%20Resources%20India']
 

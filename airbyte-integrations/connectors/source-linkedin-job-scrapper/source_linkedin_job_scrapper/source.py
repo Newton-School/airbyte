@@ -161,8 +161,6 @@ class SourceLinkedinJobScrapper(Source):
                     jd_links.add(a['href'].split("?")[0])
         return jd_links
 
-
-
     @staticmethod
     def create_open_ai_query(input_query, OPENAI_API_KEY, model_engine='gpt-3.5-turbo', temperature=0):
         openai_url = f"https://api.openai.com/v1/chat/completions"
@@ -180,28 +178,27 @@ class SourceLinkedinJobScrapper(Source):
         return {"success": False, "error": response.text}
 
     @staticmethod
-    def extract_dictionary_object_from_string(text):
-        match = re.search('{.*}', text)
-
-        if match:
-            return json.loads(match.group())
-        return dict()
-
-    def validate_and_send_correct_evaluation_response(self, text_response):
+    def validate_and_send_correct_evaluation_response(text_response):
         text_response = str(text_response).replace('\n', '')
-        evaluation_json = self.extract_dictionary_object_from_string(text_response)
+        text_response = str(text_response).replace('null', '')
+        evaluation_json = eval(text_response)
         return evaluation_json
 
     def extract_additional_details_from_job_text(self, jd_text, open_ai_key):
         prompt = "extract these details from the following text and just provide a JSON in this format" \
-                 "{'skills': {'preferredSkills': [], 'otherSkills': []}, 'min_ctc': , 'max_ctc': , 'min_experience': , 'max_experience': , 'hr_name': '', 'department': }" \
-                 "put only 3 items inside preferredSkills and otherSkills at max and those skills should be keywords only." \
+                 "{'skills': {'preferredSkills': []}, 'min_ctc': , 'max_ctc': , 'min_experience': , 'max_experience': , 'hr_name': '', 'department': }" \
+                 "put maximum 5 items inside preferredSkills and those skills should be keywords only." \
                  "if min_ctc, max_ctc, min_experience, max_experience, not available then put it zero" \
                  "hr_name is about any name email or contact number available in the text, put empty string if not there"\
                  "treat this text as job description and extract what portion or department of the company this job description would be for, put that inside department"\
                  f"text: {jd_text}"
         resp = self.create_open_ai_query(prompt, open_ai_key)
-        return self.validate_and_send_correct_evaluation_response(resp)
+        if resp['success']:
+            final_resp = self.validate_and_send_correct_evaluation_response(resp['data'])
+            if final_resp['max_experience'] < final_resp['min_experience']:
+                final_resp['max_experience'] = final_resp['min_experience']
+            return final_resp
+        return {}
 
     @staticmethod
     def get_hiring_team(jd_soup):
@@ -324,4 +321,3 @@ class SourceLinkedinJobScrapper(Source):
                     type=Type.RECORD,
                     record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
-
