@@ -77,7 +77,7 @@ class SourceLeadsquareLeads(Source):
         stream_fields = {}
         for field_name in self.required_fields:
             stream_fields[field_name] = {
-                "type": "string"
+                "type": ["string", "null"],
             }
         return stream_fields
 
