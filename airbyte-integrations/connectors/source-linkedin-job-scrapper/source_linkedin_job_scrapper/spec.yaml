@@ -4,16 +4,12 @@ connectionSpecification:
   title: Linkedin Job Scrapper Spec
   type: object
   required:
-    - username
-    - password
     - job_role
+    - open_ai_api_key
   properties:
-    username:
-      type: string
-      description: username for linkedin profile to check
-    password:
-      type: string
-      description: password for linkedin profile
     job_role:
       type: string
       description: job role for searching
+    open_ai_api_key:
+      type: string
+      description: open ai api key

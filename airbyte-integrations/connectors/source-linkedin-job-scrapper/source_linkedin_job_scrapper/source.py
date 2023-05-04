@@ -28,6 +28,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from datetime import datetime
+import logging
+logger = logging.getLogger()
+logging.basicConfig(level=logging.NOTSET)
+
 chrome_options = webdriver.ChromeOptions()
 chrome_options.binary_location = os.getenv("CHROME_BIN")
 chrome_options.add_argument('--window-size=1920,1080')
@@ -127,24 +131,6 @@ class SourceLinkedinJobScrapper(Source):
             return int(int(numeric_part2) / denominator)
         return int(int(numeric_part) / denominator)
 
-    @staticmethod
-    def get_scroll_time_count_using_selenium(url, denominator):
-        driver.get(url)
-        time.sleep(2)
-        div_element = driver.find_element("css selector", ".org-grid__content-height-enforcer")
-        h2_element = div_element.find_element("css selector", "h2")
-        results_text = h2_element.text
-        numeric_part = re.findall(r'\d+', results_text)[0]
-        return int(int(numeric_part) / denominator)
-
-    @staticmethod
-    def login_to_linkedin(username, password):
-        driver.get("https://www.linkedin.com/login")
-        driver.find_element("xpath", """//*[@id="username"]""").send_keys(username)
-        driver.find_element("xpath", """//*[@id="password"]""").send_keys(password)
-        driver.find_element("xpath", """//*[@id="organic-div"]/form/div[3]/button""").click()
-        time.sleep(1)
-
     def get_all_jobs_jd_links(self, job_role="Software%20Engineer", location="India", job_type="full_time", past_time="day",
                               job_level="entry_level"):
         jd_links = set()
@@ -175,37 +161,59 @@ class SourceLinkedinJobScrapper(Source):
                     jd_links.add(a['href'].split("?")[0])
         return jd_links
 
-    def search_people_from_company(self, company_url, keyword):
-        people_details = dict()
-        final_url = f"{company_url}/people/?keywords={keyword}"
-        scroll_times = self.get_scroll_time_count_using_selenium(final_url, denominator=12)
-        html = self.infinite_scroll(
-            final_url, scroll_times,
-            driver_required=False,
-            button_class_name="scaffold-finite-scroll__load-button"
-        )
 
-        soup = BeautifulSoup(html, 'html.parser')
-        div_tag = soup.find("div", class_=lambda x: x and "scaffold-finite-scroll__content" in x.split())
-        ul_element = div_tag.find_all('ul')[0]
 
-        li_tags = ul_element.find_all("li")
-        for li in li_tags:
-            try:
-                profile_url = li.find('a', class_='app-aware-link')['href']
-                name = li.find('div',
-                               class_='ember-view lt-line-clamp lt-line-clamp--single-line org-people-profile-card__profile-title t-black') \
-                    .text.strip()
-                description = li.find(
-                    'div', class_='ember-view lt-line-clamp lt-line-clamp--multi-line'
-                ).text.strip()
-                people_details['linkedin_profile_url'] = profile_url
-                people_details['name'] = name
-                people_details['short_intro'] = description
-            except:
-                pass
-        time.sleep(2)
-        return people_details
+    @staticmethod
+    def create_open_ai_query(input_query, OPENAI_API_KEY, model_engine='gpt-3.5-turbo', temperature=0):
+        openai_url = f"https://api.openai.com/v1/chat/completions"
+        headers = {'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json'}
+        payload = {
+            'model': model_engine,
+            'messages': [{"role": "user", "content": input_query}],
+            'temperature': temperature,
+            'max_tokens': 150
+        }
+        response = requests.post(openai_url, headers=headers, data=json.dumps(payload))
+        if response.status_code == 200 and 'choices' in response.json():
+            content_text = response.json()['choices'][0]['message']['content'].strip()
+            return {"success": True, "data": content_text, "response_json": response.json()}
+        return {"success": False, "error": response.text}
+
+    @staticmethod
+    def extract_dictionary_object_from_string(text):
+        match = re.search('{.*}', text)
+
+        if match:
+            return json.loads(match.group())
+        return dict()
+
+    def validate_and_send_correct_evaluation_response(self, text_response):
+        text_response = str(text_response).replace('\n', '')
+        evaluation_json = self.extract_dictionary_object_from_string(text_response)
+        return evaluation_json
+
+    def extract_additional_details_from_job_text(self, jd_text, open_ai_key):
+        prompt = "extract these details from the following text and just provide a JSON in this format" \
+                 "{'skills': {'preferredSkills': [], 'otherSkills': []}, 'min_ctc': , 'max_ctc': , 'min_experience': , 'max_experience': , 'hr_name': '', 'department': }" \
+                 "put only 3 items inside preferredSkills and otherSkills at max and those skills should be keywords only." \
+                 "if min_ctc, max_ctc, min_experience, max_experience, not available then put it zero" \
+                 "hr_name is about any name email or contact number available in the text, put empty string if not there"\
+                 "treat this text as job description and extract what portion or department of the company this job description would be for, put that inside department"\
+                 f"text: {jd_text}"
+        resp = self.create_open_ai_query(prompt, open_ai_key)
+        return self.validate_and_send_correct_evaluation_response(resp)
+
+    @staticmethod
+    def get_hiring_team(jd_soup):
+        h3 = jd_soup.find('h3', {'class': 'base-main-card__title font-sans text-[18px] font-bold text-color-text overflow-hidden'})
+        if h3:
+            return h3.text.strip()
+        return ''
+
+    @staticmethod
+    def remove_html_tags(text):
+        clean = re.compile('<.*?>')
+        return re.sub(clean, ' ', text)
 
     def read(
             self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
@@ -222,16 +230,22 @@ class SourceLinkedinJobScrapper(Source):
         )
 
         jd_links = self.get_all_jobs_jd_links(job_role=job_role)
+        logger.info(jd_links)
+        logger.info(len(jd_links))
         for jd_link in jd_links:
             job_details = {
                 'job_description_url': jd_link,
                 'job_description_url_without_job_id': jd_link,
-                'job_role': job_role
+                'job_role': job_role,
+                'job_source': 'linkedin',
+                'job_type': 'full-time'
             }
             try:
                 jd_link = jd_link.replace("https://in.", "https://www.")
                 soup = self.create_soup(jd_link)
                 company_details = {}
+
+                hr_name = self.get_hiring_team(soup)
 
                 h1_tag = soup.find("h1", class_="top-card-layout__title")
                 if h1_tag:
@@ -260,8 +274,7 @@ class SourceLinkedinJobScrapper(Source):
                 div_tags = soup.find_all("div", class_=lambda x: x and "show-more-less-html__markup" in x.split())
                 for div in div_tags:
                     html_content = div.decode_contents()
-                    text_soup = BeautifulSoup(html_content.strip(), "html.parser")
-                    job_details['job_description_raw_text'] = text_soup
+                    job_details['job_description_raw_text'] = self.remove_html_tags(html_content.strip())
 
                 ul_tag = soup.find("ul", class_=lambda x: x and "description__job-criteria-list" in x.split())
                 li_tags = ul_tag.find_all("li")
@@ -277,35 +290,38 @@ class SourceLinkedinJobScrapper(Source):
                     record=AirbyteRecordMessage(stream='companies', data=company_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
 
-                job_details = job_details | {
-                    'company': company_details['name'],
-                    'job_source': 'linkedin',
-                    'job_type': 'full-time'
+                job_details['company'] = company_details['name']
+
+                ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
+                                                                            config['open_ai_api_key'])
+
+                job_details = job_details | ai_response
+                logger.info("succeeded", jd_link)
+                yield AirbyteMessage(
+                    type=Type.RECORD,
+                    record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                )
+                recruiter_details = {
+                    'short_intro': ai_response['hr_name']
                 }
-            except:
-                pass
+
+                if hr_name:
+                    recruiter_details = recruiter_details | {
+                        'name': hr_name,
+                        'hiring_manager_for_job_link': jd_link,
+                        'company': company_details['name'],
+                        'linkedin_profile_url': f"dummy_{hr_name}_{company_details['name']}"
+                    }
+
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(stream='recruiter_details', data=recruiter_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    )
+            except Exception as e:
+                logger.info("failed", jd_link, str(e))
 
                 yield AirbyteMessage(
                     type=Type.RECORD,
                     record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
 
-        time.sleep(5)
-        try:
-            self.login_to_linkedin(username=config['username'], password=config['password'])
-            keywords = ['IT%20Recruiter%20India', 'Human%20Resources%20India']
-        except:
-            return
-        for company_url, company_name in company_urls.items():
-            for keyword in keywords:
-                try:
-                    people_details = self.search_people_from_company(company_url, keyword)
-                    people_details['company'] = company_name
-                    people_details['keyword'] = keyword
-                    yield AirbyteMessage(
-                        type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream='recruiter_details', data=people_details,
-                                                    emitted_at=int(datetime.now().timestamp()) * 1000),
-                    )
-                except:
-                    pass

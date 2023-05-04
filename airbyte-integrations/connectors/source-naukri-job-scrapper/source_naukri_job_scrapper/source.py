@@ -108,10 +108,15 @@ class SourceNaukriJobScrapper(Source):
         min_ctc = 0
         max_ctc = 0
         if 'Lacs' in salary and '-' in salary:
-            min_ctc, max_ctc = salary.split(" ")[0].split("-")
-            min_ctc = min_ctc.replace(',', '')
-            min_ctc = float(re.findall(r"[-+]?\d*\.\d+|\d+", min_ctc)[0])
-            max_ctc = float(max_ctc)
+            try:
+                min_ctc, max_ctc = salary.split(" ")[0].split("-")
+                min_ctc = min_ctc.replace(',', '')
+                min_ctc = float(re.findall(r"[-+]?\d*\.\d+|\d+", min_ctc)[0])
+                if len(str(min_ctc)) > 5:
+                    min_ctc = min_ctc/100000
+                max_ctc = float(max_ctc)
+            except:
+                pass
         return {
             'min_ctc': min_ctc,
             'max_ctc': max_ctc
@@ -124,6 +129,8 @@ class SourceNaukriJobScrapper(Source):
             is_relevant = False
         if min_ctc < 3:
             is_relevant = False
+        if min_ctc == 0:
+            is_relevant = True
         non_preferred_departments = ['sales', 'retail', 'business development', 'recruitment', 'administration', 'manufacturing',
                                      'finance', 'audit']
         for dept in non_preferred_departments:
@@ -204,10 +211,23 @@ class SourceNaukriJobScrapper(Source):
                 for placeholder in job_resp['placeholders']:
                     if placeholder['type'] == 'location':
                         job_extended_data['job_location'] = placeholder['label'].strip()
-
+                hr_name = extended_job_details.get('vcard', {}).get('name', '')
                 final_data = job_data | job_extended_data
 
                 yield AirbyteMessage(
                     type=Type.RECORD,
                     record=AirbyteRecordMessage(stream='job_openings', data=final_data, emitted_at=int(datetime.now().timestamp()) * 1000),
                 )
+
+                if hr_name:
+                    recruiter_details = {
+                        'name': hr_name,
+                        'hiring_manager_for_job_link': jd_url,
+                        'company': job_resp['companyName'].strip(),
+                        'linkedin_profile_url': f"dummy_{hr_name}_{job_resp['companyName'].strip()}"
+                    }
+
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(stream='recruiter_details', data=recruiter_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    )

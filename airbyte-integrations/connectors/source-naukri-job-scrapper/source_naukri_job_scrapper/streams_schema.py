@@ -138,6 +138,9 @@ stream_schema = [{
                 },
                 "country_code": {
                     "type": "string"
+                },
+                "hiring_manager_for_job_link": {
+                    "type": "string"
                 }
             }
         }
