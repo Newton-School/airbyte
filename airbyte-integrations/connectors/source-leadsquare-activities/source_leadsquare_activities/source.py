@@ -138,7 +138,8 @@ class SourceLeadsquareActivities(Source):
             {
                 "name": stream_name,
                 "supported_sync_modes": [
-                    "full_refresh"
+                    "full_refresh",
+                    "incremental",
                 ],
                 "source_defined_cursor": False,
                 "json_schema": json_schema

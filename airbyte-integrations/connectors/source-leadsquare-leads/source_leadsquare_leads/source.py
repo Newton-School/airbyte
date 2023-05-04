@@ -19,9 +19,70 @@ from airbyte_cdk.models import (
     Type,
 )
 from airbyte_cdk.sources import Source
+import requests
 
 
 class SourceLeadsquareLeads(Source):
+
+    required_fields = [
+        "ProspectId", 
+        "Bucket", 
+        "City", 
+        "CollegeCity", 
+        "CollegeName",
+        "CreatedBy",
+        "CreatedOn",
+        "CurrentInterestedCourse",
+        "DateOfBirth",
+        "Email",
+        "FirstName",
+        "GraduationYear",
+        "HighestQualification",
+        "LastActivity",
+        "LastActivityDate",
+        "LastCallConnectionStatus",
+        "LastCallStatus",
+        "LastCallSubStatus",
+        "LastName",
+        "LeadAge",
+        "LeadName",
+        "LeadNumber",
+        "LeadOrigin",
+        "LeadOwner",
+        "LeadQuality",
+        "LeadScore",
+        "LeadStage",
+        "LeadStatus",
+        "LeadSubStatus",
+        "MidFunnelBuckets",
+        "MidFunnelCount",
+        "ModifiedOn",
+        "NetworkId",
+        "Owner",
+        "PriorityStatus",
+        "ProductGraduationWar"
+        "ProspectId",
+        "ReactivationBucket",
+        "ReactivationDate",
+        "SourceIntendedCourse",
+        "SquadstackCalling",
+        "SquadstackQualificationStatus",
+        "UTMCampaign",
+        "UTMMedium",
+        "UTMReferer",
+        "UTMSource",
+        "WorkExperience",
+        "YearOfPassingInText", 
+    ]
+
+    def get_stream_fields(self):
+        stream_fields = {}
+        for field_name in self.required_fields:
+            stream_fields[field_name] = {
+                "type": "string"
+            }
+        return stream_fields
+
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the integration
@@ -35,11 +96,44 @@ class SourceLeadsquareLeads(Source):
         :return: AirbyteConnectionStatus indicating a Success or Failure
         """
         try:
-            # Not Implemented
+            request_host = config['leadsquare-host']
+            access_key = config['leadsquare-access-key']
+            secret_key = config['leadsquare-secret-key']
 
-            return AirbyteConnectionStatus(status=Status.SUCCEEDED)
+            current_datetime = datetime.now()
+
+            current_start_hour_timestamp = current_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+            current_end_hour_timestamp = current_datetime.replace(hour=23, minute=59, second=59, microsecond=999)
+
+            leadsquare_response = requests.post(
+                url=f'{request_host}/v2/LeadManagement.svc/Leads.RecentlyModified?',
+                params={
+                    "accessKey": access_key,
+                    "secretKey": secret_key,
+                },
+                json={
+                    "Parameter": {
+                        "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                        "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    },
+                    "Paging": {
+                        "PageIndex": 1,
+                        "PageSize": 1
+                    },
+                    "Sorting": {
+                        "ColumnName": "CreatedOn",
+                        "Direction": 1
+                    }
+                }
+            )
+
+            if 200 <= leadsquare_response.status_code < 300:
+                return AirbyteConnectionStatus(status=Status.SUCCEEDED)
+
+            return AirbyteConnectionStatus(status=Status.FAILED, message=f"Threw {leadsquare_response.status_code} Status code, with {leadsquare_response.json()} response.")
         except Exception as e:
             return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {str(e)}")
+
 
     def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
         """
@@ -58,18 +152,26 @@ class SourceLeadsquareLeads(Source):
             - json_schema providing the specifications of expected schema for this stream (a list of columns described
             by their names and types)
         """
-        streams = []
 
-        stream_name = "TableName"  # Example
-        json_schema = {  # Example
+        stream_name = "LeadSquareLead"
+        json_schema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
-            "properties": {"columnName": {"type": "string"}},
+            "properties": self.get_stream_fields(),
         }
 
-        # Not Implemented
+        streams = [
+            {
+                "name": stream_name,
+                "supported_sync_modes": [
+                    "full_refresh",
+                    "incremental",
+                ],
+                "source_defined_cursor": False,
+                "json_schema": json_schema
+            }
+        ]
 
-        streams.append(AirbyteStream(name=stream_name, json_schema=json_schema))
         return AirbyteCatalog(streams=streams)
 
     def read(
@@ -94,12 +196,51 @@ class SourceLeadsquareLeads(Source):
 
         :return: A generator that produces a stream of AirbyteRecordMessage contained in AirbyteMessage object.
         """
-        stream_name = "TableName"  # Example
-        data = {"columnName": "Hello World"}  # Example
+        stream_name = "LeadSquareLeads"
+        request_host = config['leadsquare-host']
+        access_key = config['leadsquare-access-key']
+        secret_key = config['leadsquare-secret-key']
 
-        # Not Implemented
+        current_datetime = datetime.now()
 
-        yield AirbyteMessage(
-            type=Type.RECORD,
-            record=AirbyteRecordMessage(stream=stream_name, data=data, emitted_at=int(datetime.now().timestamp()) * 1000),
-        )
+        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
+        current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999)
+
+        try:
+            leadsquare_response = requests.post(
+                url=f'{request_host}/v2/LeadManagement.svc/Leads.RecentlyModified',
+                params={
+                    "accessKey": access_key,
+                    "secretKey": secret_key,
+                },
+                json={
+                    "Parameter": {
+                        "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                        "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    },
+                    "Columns": {
+                        "Include_CSV": ','.join(self.get_stream_fields)
+                    },
+                    "Sorting": {
+                        "ColumnName": "CreatedOn",
+                        "Direction": 1
+                    }
+                }
+            )
+
+            if 200 <= leadsquare_response.status_code < 300:
+                for leadsquare_leads in leadsquare_response.json()['Leads']:
+                    lead_data = {}
+
+                    for lead_property in leadsquare_leads["LeadPropertyList"]:
+                        if lead_property["Attribute"] in self.get_stream_fields:
+                            lead_data[lead_property["Attribute"]] = lead_property["Value"]
+
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(stream=stream_name, data=lead_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    )
+            else:
+                logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
+        except Exception as e:
+            logger.error(f'Error while running activity query: {str(e)}')
