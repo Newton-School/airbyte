@@ -4,7 +4,6 @@
 
 
 import json
-import requests
 from datetime import datetime
 from typing import Dict, Generator
 
@@ -210,9 +209,9 @@ class SourceLeadsquareActivities(Source):
                         "activityType": leadsquare_activities['ActivityType'],
                         "type": leadsquare_activities['Type'],
                         "relatedProspectId": leadsquare_activities['RelatedProspectId'],
-                        "activityData": leadsquare_activities['Data'],
-                        "sessionId": leadsquare_activities['SessionId'],
-                        "activityCustomFields": leadsquare_activities['Fields'],
+                        "activityData": leadsquare_activities.get('Data', {}) if leadsquare_activities.get('Data', {}) else {},
+                        "sessionId": leadsquare_activities.get('SessionId', ''),
+                        "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
                     }
 
                     yield AirbyteMessage(
