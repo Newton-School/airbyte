@@ -236,8 +236,8 @@ class SourceLeadsquareActivities(Source):
                             type=Type.RECORD,
                             record=AirbyteRecordMessage(stream=stream_name, data=lead_activity_data, emitted_at=int(datetime.now().timestamp()) * 1000),
                         )
-                        time.sleep(5)
-                        page_index += 1
+                    time.sleep(5)
+                    page_index += 1
                 else:
                     logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
                     break
