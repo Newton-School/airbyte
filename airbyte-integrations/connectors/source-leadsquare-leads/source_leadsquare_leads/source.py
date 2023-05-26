@@ -26,7 +26,7 @@ import requests
 class SourceLeadsquareLeads(Source):
 
     required_fields = [
-        "ProspectId", 
+        "ProspectID",
         "mx_Bucket", 
         "mx_City", 
         "mx_College_City", 
@@ -58,8 +58,7 @@ class SourceLeadsquareLeads(Source):
         "mx_Network_Id",
         "OwnerIdName",
         "mx_Priority_Status",
-        "mx_Product_Graduation_Year"
-        "ProspectId",
+        "mx_Product_Graduation_Year",
         "mx_Reactivation_Bucket",
         "mx_Reactivation_Date",
         "mx_Source_Intended_Course",
