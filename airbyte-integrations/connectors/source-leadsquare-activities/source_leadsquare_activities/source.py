@@ -4,8 +4,9 @@
 
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Generator
+import time
 
 import requests
 from airbyte_cdk.logger import AirbyteLogger
@@ -95,6 +96,12 @@ class SourceLeadsquareActivities(Source):
             "activityId": {
                 "type": "string"
             },
+            "createdOn": {
+                "type": "string"
+            },
+            "modifiedOn": {
+                "type": "string"
+            },
             "eventCode": {
                 "type": "number",
             },
@@ -177,49 +184,62 @@ class SourceLeadsquareActivities(Source):
 
         current_datetime = datetime.now()
 
-        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
-        current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999)
+        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+        current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
 
         try:
-            leadsquare_response = requests.post(
-                url=f'{request_host}/v2/ProspectActivity.svc/RetrieveRecentlyModified',
-                params={
-                    "accessKey": access_key,
-                    "secretKey": secret_key,
-                },
-                json={
-                    "Parameter": {
-                        "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                        "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                        "IncludeCustomFields": 1
+            page_index = 1
+            while True:
+                leadsquare_response = requests.post(
+                    url=f'{request_host}/v2/ProspectActivity.svc/RetrieveRecentlyModified',
+                    params={
+                        "accessKey": access_key,
+                        "secretKey": secret_key,
                     },
-                    "Sorting": {
-                        "ColumnName": "CreatedOn",
-                        "Direction": 1
+                    json={
+                        "Parameter": {
+                            "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                            "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                            "IncludeCustomFields": 1
+                        },
+                        "Paging": {
+                            "PageIndex": page_index,
+                            "PageSize": 1000
+                        },
+                        "Sorting": {
+                            "ColumnName": "CreatedOn",
+                            "Direction": 1
+                        }
                     }
-                }
-            )
+                )
 
-            if 200 <= leadsquare_response.status_code < 300:
-                for leadsquare_activities in leadsquare_response.json()['ProspectActivities']:
-                    lead_activity_data = {
-                        "activityId": leadsquare_activities['Id'],
-                        "eventCode": leadsquare_activities['EventCode'],
-                        "eventName": leadsquare_activities['EventName'],
-                        "activityScore": leadsquare_activities['ActivityScore'],
-                        "activityType": leadsquare_activities['ActivityType'],
-                        "type": leadsquare_activities['Type'],
-                        "relatedProspectId": leadsquare_activities['RelatedProspectId'],
-                        "activityData": leadsquare_activities.get('Data', {}) if leadsquare_activities.get('Data', {}) else {},
-                        "sessionId": leadsquare_activities.get('SessionId', ''),
-                        "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
-                    }
+                if 200 <= leadsquare_response.status_code < 300:
+                    if len(leadsquare_response.json()['ProspectActivities']) == 0:
+                        break
+                    for leadsquare_activities in leadsquare_response.json()['ProspectActivities']:
+                        lead_activity_data = {
+                            "activityId": leadsquare_activities['Id'],
+                            "eventCode": leadsquare_activities['EventCode'],
+                            "eventName": leadsquare_activities['EventName'],
+                            "createdOn": leadsquare_activities['CreatedOn'],
+                            "modifiedOn": leadsquare_activities['ModifiedOn'],
+                            "activityScore": leadsquare_activities['ActivityScore'],
+                            "activityType": leadsquare_activities['ActivityType'],
+                            "type": leadsquare_activities['Type'],
+                            "relatedProspectId": leadsquare_activities['RelatedProspectId'],
+                            "activityData": leadsquare_activities.get('Data', {}) if leadsquare_activities.get('Data', {}) else {},
+                            "sessionId": leadsquare_activities.get('SessionId', ''),
+                            "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
+                        }
 
-                    yield AirbyteMessage(
-                        type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream=stream_name, data=lead_activity_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                    )
-            else:
-                logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
+                        yield AirbyteMessage(
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(stream=stream_name, data=lead_activity_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        )
+                        time.sleep(5)
+                        page_index += 1
+                else:
+                    logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
+                    break
         except Exception as e:
             logger.error(f'Error while running activity query: {str(e)}')
