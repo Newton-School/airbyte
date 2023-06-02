@@ -184,7 +184,7 @@ class SourceLinkedinJobScrapper(Source):
         evaluation_json = eval(text_response)
         return evaluation_json
 
-    def extract_additional_details_from_job_text(self, jd_text, open_ai_key):
+    def extract_additional_details_from_job_text(self, jd_text, open_ai_key, model_engine='gpt-3.5-turbo'):
         prompt = "extract these details from the following text and just provide a JSON in this format" \
                  "{'skills': {'preferredSkills': []}, 'min_ctc': , 'max_ctc': , 'min_experience': , 'max_experience': , 'hr_name': '', 'department': }" \
                  "put maximum 5 items inside preferredSkills and those skills should be keywords only." \
@@ -192,7 +192,7 @@ class SourceLinkedinJobScrapper(Source):
                  "hr_name is about any name email or contact number available in the text, put empty string if not there"\
                  "treat this text as job description and extract what portion or department of the company this job description would be for, put that inside department"\
                  f"text: {jd_text}"
-        resp = self.create_open_ai_query(prompt, open_ai_key)
+        resp = self.create_open_ai_query(prompt, open_ai_key, model_engine=model_engine)
         if resp['success']:
             final_resp = self.validate_and_send_correct_evaluation_response(resp['data'])
             if final_resp['max_experience'] < final_resp['min_experience']:
@@ -216,108 +216,150 @@ class SourceLinkedinJobScrapper(Source):
             self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
 
-        company_urls = dict()
+        config_role = config['job_role']
+        if config_role == 'dummy':
+            job_roles = ["Angular Developer", "Angular JS Developer", "Associate Software Engineer", "Backend Developer", "C# Developer",
+                         "C++ Developer", "Developer", "Client-Side Developer", "Embedded Software Developer", "Embedded Software Engineer",
+                         "Front End Web Developer", "Front-End Developer", "Frontend Angular Developer", "Frontend Architect",
+                         "Frontend Developer", "Frontend Engineer", "Frontend Web Developer", "Full Stack Developer",
+                         "Full Stack Java Developer", "Full Stack Software Engineer", "HTML Developer", "Java Backend Developer",
+                         "Java Developer", "Java Fullstack Developer", "Java Microservices Developer", "Java React Developer",
+                         "Java SpringBoot Developer", "Javascript Developer", "Junior Software Developer", "Junior Software Engineer",
+                         "Mean Stack Developer", "MERN Stack Developer", "MIS", "MIS Analyst", "MIS Executive and Analyst",
+                         "Node JS Developer", "Node.js Developer", "Python Developer", "Python/Django Developer", "React Developer",
+                         "React Js Developer", "React.js Developer", "React/Frontend Developer", "React+Node Js Developer",
+                         "RIM Support Engineer", "Ruby on Rails Developer", "SAP HANA DB Administration Software Development Engineer",
+                         "Software Developer", "Software Development Engineer", "Software Engineer", "Software Engineer Trainee",
+                         "Software Programmer", "Solution Developer", "SYBASE Database Administration Software Development Engineer",
+                         "Trainee Associate Engineer", "Trainee Software Developer", "Trainee Software Engineer", "UI Angular Developer",
+                         "UI Developer", "UI Frontend Developer", "UI/Frontend Developer", "UI/UX Developer", "Web and Software Developer",
+                         "Web Designer & Developer", "Web Designer and Developer", "Web Designer/Developer", "Web Developer",
+                         "Web Developer and Designer", "Website Designer", "website developer", "XML and C# Developer", "PHP Developer",
+                         "Laravel Developer", "Magento Developer", "Drupal Developer", "Dotnet developer", ".net ", "Vue.JS Developer",
+                         "Python/Django Developer", "GoLang developer", "jQuery", "Springboot Developer", "Actuarial Analyst", "Analyst",
+                         "AR Analyst", "Associate Business Analyst", "Automation Test Analyst", "Azure Data Engineer", "Big Data Engineer",
+                         "Business Analyst", "Business Data Analyst", "Data Analyst", "Data Analytics Trainer", "Data Research Analyst",
+                         "Data Researcher", "Data Science Engineer", "Data Scientist", "Database Administrator", "Functional Analyst",
+                         "Junior Analyst", "Junior Research Analyst", "KYC Analyst", "Market Research Analyst", "Power BI Developer",
+                         "Product Analyst", "Programmer Analyst", "QA Analyst", "Quality Analyst", "Real Time Analyst",
+                         "Reconciliation Analyst", "Research Analyst", "Risk Analyst", "Sales Analyst", "Salesforce Business Analyst",
+                         "Service Desk Analyst", "SOC Analyst", "SQL Developer", "Android Application Developer", "Android Developer",
+                         "Android Mobile Application Developer", "Application Developer", "Application Support Engineer",
+                         "Flutter Developer", "iOS Application Developer", "IOS Developer", "Mobile App Developer",
+                         "Mobile Application Developer", "Associate Technical Support Engineer", "Automation Engineer",
+                         "Automation Test Engineer", "Batch Support Engineer", "Desktop Support Engineer", "Genesys Support Engineer",
+                         "IT Support Engineer", "Network Support Engineer", "QA Automation Engineer", "SaaS Support Engineer",
+                         "Security Engineer", "Test Automation Engineer", "Systems Support Engineer",
+                         "Software Development Engineer - Test", "Software Test Engineer", "Software Tester", "Support Engineer",
+                         "Tech Customer Support Engineer", "Technical Support Engineer", "Servicenow Developer", "SharePoint Developer",
+                         "Shopify Developer", "Unity Game Developer", "WordPress & Shopify Developer", "WordPress Developer",
+                         "Wordpress Web Developer", "Unreal Developer"]
+            for id, jr in enumerate(job_roles):
+                job_roles[id] = jr.replace(" ", "%20")
+        else:
+            job_roles = [config_role]
 
-        job_role = config['job_role']
+        for job_role in job_roles:
+            job_role_data = {'title': job_role}
+            yield AirbyteMessage(
+                type=Type.RECORD,
+                record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+            )
 
-        job_role_data = {'title': job_role}
-        yield AirbyteMessage(
-            type=Type.RECORD,
-            record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-        )
-
-        jd_links = self.get_all_jobs_jd_links(job_role=job_role)
-        logger.info(jd_links)
-        logger.info(len(jd_links))
-        for jd_link in jd_links:
-            job_details = {
-                'job_description_url': jd_link,
-                'job_description_url_without_job_id': jd_link,
-                'job_role': job_role,
-                'job_source': 'linkedin',
-                'job_type': 'full-time'
-            }
-            try:
-                jd_link = jd_link.replace("https://in.", "https://www.")
-                soup = self.create_soup(jd_link)
-                company_details = {}
-
-                hr_name = self.get_hiring_team(soup)
-
-                h1_tag = soup.find("h1", class_="top-card-layout__title")
-                if h1_tag:
-                    job_details['job_title'] = h1_tag.text
-
-                company_span_tags = soup.find_all("span", class_=lambda x: x and "topcard__flavor" in x.split())
-                for span in company_span_tags:
-                    a_tag = span.find("a")
-                    if a_tag:
-                        text = a_tag.text.strip()
-                        href = a_tag.get("href")
-                        company_details['name'] = text
-                        company_details['linkedin_url'] = str(href).split("?")[0]
-                        company_urls.update({str(href).split("?")[0]: text})
-
-                details_span_tags = soup.find_all("span", class_=lambda x: x and "topcard__flavor--bullet" in x.split())
-                span_texts = []
-                for span in details_span_tags:
-                    span_texts.append(span.text.strip())
-                if len(span_texts) == 1:
-                    job_details['job_location'] = span_texts[0]
-                if len(span_texts) == 2:
-                    job_details['job_location'] = span_texts[0]
-                    job_details['raw_response'] = {'applicants': span_texts[1]}
-
-                div_tags = soup.find_all("div", class_=lambda x: x and "show-more-less-html__markup" in x.split())
-                for div in div_tags:
-                    html_content = div.decode_contents()
-                    job_details['job_description_raw_text'] = self.remove_html_tags(html_content.strip())
-
-                ul_tag = soup.find("ul", class_=lambda x: x and "description__job-criteria-list" in x.split())
-                li_tags = ul_tag.find_all("li")
-                for li in li_tags:
-                    h3_tag = li.find("h3")
-                    h3_text = h3_tag.get_text(strip=True) if h3_tag else ""
-                    span_tag = li.find("span")
-                    span_text = span_tag.get_text(strip=True) if span_tag else ""
-                    job_details[h3_text] = span_text
-
-                yield AirbyteMessage(
-                    type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='companies', data=company_details, emitted_at=int(datetime.now().timestamp()) * 1000),
-                )
-
-                job_details['company'] = company_details['name']
-
-                ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
-                                                                            config['open_ai_api_key'])
-
-                job_details = job_details | ai_response
-                logger.info("succeeded", jd_link)
-                yield AirbyteMessage(
-                    type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
-                )
-                recruiter_details = {
-                    'short_intro': ai_response['hr_name']
+            jd_links = self.get_all_jobs_jd_links(job_role=job_role)
+            logger.info(jd_links)
+            logger.info(len(jd_links))
+            for jd_link in jd_links:
+                job_details = {
+                    'job_description_url': jd_link,
+                    'job_description_url_without_job_id': jd_link,
+                    'job_role': job_role,
+                    'job_source': 'linkedin',
+                    'job_type': 'full-time'
                 }
+                try:
+                    jd_link = jd_link.replace("https://in.", "https://www.")
+                    soup = self.create_soup(jd_link)
+                    company_details = {}
 
-                if hr_name:
-                    recruiter_details = recruiter_details | {
-                        'name': hr_name,
-                        'hiring_manager_for_job_link': jd_link,
-                        'company': company_details['name'],
-                        'linkedin_profile_url': f"dummy_{hr_name}_{company_details['name']}"
-                    }
+                    hr_name = self.get_hiring_team(soup)
+
+                    h1_tag = soup.find("h1", class_="top-card-layout__title")
+                    if h1_tag:
+                        job_details['job_title'] = h1_tag.text
+
+                    company_span_tags = soup.find_all("span", class_=lambda x: x and "topcard__flavor" in x.split())
+                    for span in company_span_tags:
+                        a_tag = span.find("a")
+                        if a_tag:
+                            text = a_tag.text.strip()
+                            href = a_tag.get("href")
+                            company_details['name'] = text
+                            company_details['linkedin_url'] = str(href).split("?")[0]
+
+                    details_span_tags = soup.find_all("span", class_=lambda x: x and "topcard__flavor--bullet" in x.split())
+                    span_texts = []
+                    for span in details_span_tags:
+                        span_texts.append(span.text.strip())
+                    if len(span_texts) == 1:
+                        job_details['job_location'] = span_texts[0]
+                    if len(span_texts) == 2:
+                        job_details['job_location'] = span_texts[0]
+                        job_details['raw_response'] = {'applicants': span_texts[1]}
+
+                    div_tags = soup.find_all("div", class_=lambda x: x and "show-more-less-html__markup" in x.split())
+                    for div in div_tags:
+                        html_content = div.decode_contents()
+                        job_details['job_description_raw_text'] = self.remove_html_tags(html_content.strip())
+
+                    ul_tag = soup.find("ul", class_=lambda x: x and "description__job-criteria-list" in x.split())
+                    li_tags = ul_tag.find_all("li")
+                    for li in li_tags:
+                        h3_tag = li.find("h3")
+                        h3_text = h3_tag.get_text(strip=True) if h3_tag else ""
+                        span_tag = li.find("span")
+                        span_text = span_tag.get_text(strip=True) if span_tag else ""
+                        job_details[h3_text] = span_text
 
                     yield AirbyteMessage(
                         type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream='recruiter_details', data=recruiter_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        record=AirbyteRecordMessage(stream='companies', data=company_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                     )
-            except Exception as e:
-                logger.info("failed", jd_link, str(e))
 
-                yield AirbyteMessage(
-                    type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
-                )
+                    job_details['company'] = company_details['name']
+
+                    ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
+                                                                                config['open_ai_api_key'])
+                    if 'skills' not in ai_response:
+                        logger.info('skills not found')
+                        ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
+                                                                                    config['open_ai_api_key'], model_engine='gpt-4')
+                    job_details = job_details | ai_response
+                    logger.info("succeeded", jd_link)
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    )
+                    recruiter_details = {
+                        'short_intro': ai_response['hr_name']
+                    }
+
+                    if hr_name:
+                        recruiter_details = recruiter_details | {
+                            'name': hr_name,
+                            'hiring_manager_for_job_link': jd_link,
+                            'company': company_details['name'],
+                            'linkedin_profile_url': f"dummy_{hr_name}_{company_details['name']}"
+                        }
+
+                        yield AirbyteMessage(
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(stream='recruiter_details', data=recruiter_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        )
+                except Exception as e:
+                    logger.info("failed", jd_link, str(e))
+
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    )

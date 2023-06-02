@@ -144,90 +144,96 @@ class SourceNaukriJobScrapper(Source):
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
 
-        job_role = config['job_role']
+        config_role = config['job_role']
+        if config_role == 'dummy':
+            job_roles = ["Angular Developer", "Angular JS Developer", "Associate Software Engineer","Backend Developer","C# Developer","C++ Developer","Developer","Client-Side Developer","Embedded Software Developer","Embedded Software Engineer","Front End Web Developer","Front-End Developer","Frontend Angular Developer","Frontend Architect","Frontend Developer","Frontend Engineer","Frontend Web Developer","Full Stack Developer","Full Stack Java Developer","Full Stack Software Engineer","HTML Developer","Java Backend Developer","Java Developer","Java Fullstack Developer","Java Microservices Developer","Java React Developer","Java SpringBoot Developer","Javascript Developer","Junior Software Developer","Junior Software Engineer","Mean Stack Developer","MERN Stack Developer","MIS","MIS Analyst","MIS Executive and Analyst","Node JS Developer","Node.js Developer","Python Developer","Python/Django Developer","React Developer","React Js Developer","React.js Developer","React/Frontend Developer","React+Node Js Developer","RIM Support Engineer","Ruby on Rails Developer","SAP HANA DB Administration Software Development Engineer","Software Developer","Software Development Engineer","Software Engineer","Software Engineer Trainee","Software Programmer","Solution Developer","SYBASE Database Administration Software Development Engineer","Trainee Associate Engineer","Trainee Software Developer","Trainee Software Engineer","UI Angular Developer","UI Developer","UI Frontend Developer","UI/Frontend Developer","UI/UX Developer","Web and Software Developer","Web Designer & Developer","Web Designer and Developer","Web Designer/Developer","Web Developer","Web Developer and Designer","Website Designer","website developer","XML and C# Developer","PHP Developer","Laravel Developer","Magento Developer","Drupal Developer","Dotnet developer",".net ","Vue.JS Developer","Python/Django Developer","GoLang developer","jQuery","Springboot Developer","Actuarial Analyst","Analyst","AR Analyst","Associate Business Analyst","Automation Test Analyst","Azure Data Engineer","Big Data Engineer","Business Analyst","Business Data Analyst","Data Analyst","Data Analytics Trainer","Data Research Analyst","Data Researcher","Data Science Engineer","Data Scientist","Database Administrator","Functional Analyst","Junior Analyst","Junior Research Analyst","KYC Analyst","Market Research Analyst","Power BI Developer","Product Analyst","Programmer Analyst","QA Analyst","Quality Analyst","Real Time Analyst","Reconciliation Analyst","Research Analyst","Risk Analyst","Sales Analyst","Salesforce Business Analyst","Service Desk Analyst","SOC Analyst","SQL Developer","Android Application Developer","Android Developer","Android Mobile Application Developer","Application Developer","Application Support Engineer","Flutter Developer","iOS Application Developer","IOS Developer","Mobile App Developer","Mobile Application Developer","Associate Technical Support Engineer","Automation Engineer","Automation Test Engineer","Batch Support Engineer","Desktop Support Engineer","Genesys Support Engineer","IT Support Engineer","Network Support Engineer","QA Automation Engineer","SaaS Support Engineer","Security Engineer","Test Automation Engineer","Systems Support Engineer","Software Development Engineer - Test","Software Test Engineer","Software Tester","Support Engineer","Tech Customer Support Engineer","Technical Support Engineer","Servicenow Developer","SharePoint Developer","Shopify Developer","Unity Game Developer","WordPress & Shopify Developer","WordPress Developer","Wordpress Web Developer","Unreal Developer"]
 
-        job_role_data = {'title': job_role}
-        yield AirbyteMessage(
-            type=Type.RECORD,
-            record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-        )
-
-        response_for_pages = self.get_naukri_request_response(job_role)
-        if 'noOfJobs' in response_for_pages:
-            total_pages = response_for_pages['noOfJobs'] // 30
         else:
-            total_pages = 1
+            job_roles = [config_role]
 
-        for page in range(1, total_pages):
-            response_for_job = self.get_naukri_request_response(job_role, page)
+        for job_role in job_roles:
+            job_role_data = {'title': job_role}
+            yield AirbyteMessage(
+                type=Type.RECORD,
+                record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+            )
 
-            for job_resp in response_for_job['jobDetails']:
-                company_data = {"name": job_resp['companyName'].strip()}
-                yield AirbyteMessage(
-                    type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='companies', data=company_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                )
+            response_for_pages = self.get_naukri_request_response(job_role)
+            if 'noOfJobs' in response_for_pages:
+                total_pages = response_for_pages['noOfJobs'] // 30
+            else:
+                total_pages = 1
 
-                jd_url = "https://www.naukri.com" + job_resp.get('jdURL', '')
-                job_data = {
-                    'job_title': job_resp['title'].strip(),
-                    'job_role': job_role_data['title'],
-                    'job_description_url': jd_url,
-                    'company': company_data['name'],
-                    'job_description_url_without_job_id': jd_url.replace(job_resp.get('jobId', ''), ''),
-                    'job_description_raw_text': self.remove_html_tags(job_resp['jobDescription'].strip()),
-                    'job_source': 'naukri'
-                }
+            for page in range(1, total_pages):
+                response_for_job = self.get_naukri_request_response(job_role, page)
 
-                job_extended_response = requests.get(
-                    'https://www.naukri.com/jobapi/v4/job/' + job_resp.get('jobId', ''),
-                    headers={
-                        'appid': app_id,
-                        'systemid': system_id,
-                    })
-                extended_job_details = job_extended_response.json()['jobDetails']
+                for job_resp in response_for_job['jobDetails']:
+                    company_data = {"name": job_resp['companyName'].strip()}
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(stream='companies', data=company_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                    )
 
-                salary = self.extract_min_max_ctc(extended_job_details['salaryDetail']['label'])
-                min_ctc = salary['min_ctc']
-                max_ctc = salary['max_ctc']
-                job_extended_data = {
-                    'skills': {
-                        'preferredSkills': self.get_labels(extended_job_details['keySkills']['preferred']),
-                        'otherSkills': self.get_labels(extended_job_details['keySkills']['other']),
-                    },
-                    'department': extended_job_details['functionalArea'],
-                    'job_type': extended_job_details['employmentType'],
-                    'min_ctc': min_ctc,
-                    'max_ctc': max_ctc,
-                    'relevancy_score': self.get_relevancy_score(
-                        min_ctc, extended_job_details['minimumExperience'], extended_job_details['functionalArea'],
-                        self.get_labels(extended_job_details['keySkills']['preferred'])
-                    ),
-                    'raw_response': extended_job_details,
-                    'min_experience': extended_job_details['minimumExperience'],
-                    'max_experience': extended_job_details['maximumExperience']
-                }
-
-                for placeholder in job_resp['placeholders']:
-                    if placeholder['type'] == 'location':
-                        job_extended_data['job_location'] = placeholder['label'].strip()
-                hr_name = extended_job_details.get('vcard', {}).get('name', '')
-                final_data = job_data | job_extended_data
-
-                yield AirbyteMessage(
-                    type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='job_openings', data=final_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                )
-
-                if hr_name:
-                    recruiter_details = {
-                        'name': hr_name,
-                        'hiring_manager_for_job_link': jd_url,
-                        'company': job_resp['companyName'].strip(),
-                        'linkedin_profile_url': f"dummy_{hr_name}_{job_resp['companyName'].strip()}"
+                    jd_url = "https://www.naukri.com" + job_resp.get('jdURL', '')
+                    job_data = {
+                        'job_title': job_resp['title'].strip(),
+                        'job_role': job_role_data['title'],
+                        'job_description_url': jd_url,
+                        'company': company_data['name'],
+                        'job_description_url_without_job_id': jd_url.replace(job_resp.get('jobId', ''), ''),
+                        'job_description_raw_text': self.remove_html_tags(job_resp['jobDescription'].strip()),
+                        'job_source': 'naukri'
                     }
+
+                    job_extended_response = requests.get(
+                        'https://www.naukri.com/jobapi/v4/job/' + job_resp.get('jobId', ''),
+                        headers={
+                            'appid': app_id,
+                            'systemid': system_id,
+                        })
+                    extended_job_details = job_extended_response.json()['jobDetails']
+
+                    salary = self.extract_min_max_ctc(extended_job_details['salaryDetail']['label'])
+                    min_ctc = salary['min_ctc']
+                    max_ctc = salary['max_ctc']
+                    job_extended_data = {
+                        'skills': {
+                            'preferredSkills': self.get_labels(extended_job_details['keySkills']['preferred']),
+                            'otherSkills': self.get_labels(extended_job_details['keySkills']['other']),
+                        },
+                        'department': extended_job_details['functionalArea'],
+                        'job_type': extended_job_details['employmentType'],
+                        'min_ctc': min_ctc,
+                        'max_ctc': max_ctc,
+                        'relevancy_score': self.get_relevancy_score(
+                            min_ctc, extended_job_details['minimumExperience'], extended_job_details['functionalArea'],
+                            self.get_labels(extended_job_details['keySkills']['preferred'])
+                        ),
+                        'raw_response': extended_job_details,
+                        'min_experience': extended_job_details['minimumExperience'],
+                        'max_experience': extended_job_details['maximumExperience']
+                    }
+
+                    for placeholder in job_resp['placeholders']:
+                        if placeholder['type'] == 'location':
+                            job_extended_data['job_location'] = placeholder['label'].strip()
+                    hr_name = extended_job_details.get('vcard', {}).get('name', '')
+                    final_data = job_data | job_extended_data
 
                     yield AirbyteMessage(
                         type=Type.RECORD,
-                        record=AirbyteRecordMessage(stream='recruiter_details', data=recruiter_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        record=AirbyteRecordMessage(stream='job_openings', data=final_data, emitted_at=int(datetime.now().timestamp()) * 1000),
                     )
+
+                    if hr_name:
+                        recruiter_details = {
+                            'name': hr_name,
+                            'hiring_manager_for_job_link': jd_url,
+                            'company': job_resp['companyName'].strip(),
+                            'linkedin_profile_url': f"dummy_{hr_name}_{job_resp['companyName'].strip()}"
+                        }
+
+                        yield AirbyteMessage(
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(stream='recruiter_details', data=recruiter_details, emitted_at=int(datetime.now().timestamp()) * 1000),
+                        )

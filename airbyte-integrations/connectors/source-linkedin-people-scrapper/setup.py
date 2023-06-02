@@ -9,7 +9,8 @@ MAIN_REQUIREMENTS = [
     "airbyte-cdk~=0.2",
     "bs4~=0.0.1",
     "selenium~=4.9.0",
-    "sqlalchemy==2.0.1"
+    "sqlalchemy==2.0.1",
+    "psycopg2-binary==2.9.6"
 ]
 
 TEST_REQUIREMENTS = [
