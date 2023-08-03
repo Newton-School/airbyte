@@ -188,14 +188,15 @@ class SourceLeadsquareActivities(Source):
         current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
 
         try:
-            start_timestamp = datetime(day=1, month=5, year=2023, hour=0, minute=0, second=0)
-            end_timestamp = datetime(day=16, month=5, year=2023, hour=0, minute=0, second=0)
+            start_timestamp = datetime(day=24, month=7, year=2023, hour=0, minute=0, second=0)
+            end_timestamp = datetime(day=1, month=8, year=2023, hour=0, minute=0, second=0)
             current_datetime = start_timestamp
-            current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
-            current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
             while current_datetime < end_timestamp:
                 page_index = 1
                 while True:
+                    print("requesting started", page_index, "for", current_datetime )
+                    current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+                    current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
                     leadsquare_response = requests.post(
                         url=f'{request_host}/v2/ProspectActivity.svc/RetrieveRecentlyModified',
                         params={
@@ -242,11 +243,12 @@ class SourceLeadsquareActivities(Source):
                                 type=Type.RECORD,
                                 record=AirbyteRecordMessage(stream=stream_name, data=lead_activity_data, emitted_at=int(datetime.now().timestamp()) * 1000),
                             )
-                            time.sleep(5)
-                            page_index += 1
                     else:
                         logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
                         break
+                    time.sleep(1)
+                    print("requesting ended", page_index, "for", current_datetime)
+                    page_index += 1
                 current_datetime = current_datetime + timedelta(hours=1)
         except Exception as e:
             logger.error(f'Error while running activity query: {str(e)}')
