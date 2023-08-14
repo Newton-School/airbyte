@@ -181,6 +181,8 @@ class SourceLeadsquareActivities(Source):
         request_host = config['leadsquare-host']
         access_key = config['leadsquare-access-key']
         secret_key = config['leadsquare-secret-key']
+        start_date = config['backfiller-start-date']
+        end_date = config['backfiller-end-date']
 
         current_datetime = datetime.now()
 
@@ -188,8 +190,8 @@ class SourceLeadsquareActivities(Source):
         current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
 
         try:
-            start_timestamp = datetime(day=24, month=7, year=2023, hour=0, minute=0, second=0)
-            end_timestamp = datetime(day=1, month=8, year=2023, hour=0, minute=0, second=0)
+            start_timestamp = datetime.strptime(start_date, "%Y-%m-%d")
+            end_timestamp = datetime.strptime(end_date, "%Y-%m-%d")
             current_datetime = start_timestamp
             while current_datetime < end_timestamp:
                 page_index = 1

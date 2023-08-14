@@ -17,3 +17,9 @@ connectionSpecification:
     leadsquare-secret-key:
       type: string
       description: leadsquare secret key
+    backfiller-start-date:
+      type: string
+      description: backfiller start date
+    backfiller-end-date:
+      type: string
+      description: backfiller end date
