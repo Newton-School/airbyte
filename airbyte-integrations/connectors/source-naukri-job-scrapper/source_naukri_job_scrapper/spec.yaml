@@ -5,7 +5,11 @@ connectionSpecification:
   type: object
   required:
     - job_role
+    - max_page
   properties:
     job_role:
       type: string
       description: Job Role to Search in Naukri.com
+    max_page:
+      type: integer
+      description: Max Page per Job Role in Naukri.com search
