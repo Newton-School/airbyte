@@ -1,4 +1,7 @@
 # Leadsquare Activities Source
+## Powered by Newton Data Engineering Team, Founded By Drumil Patel(weastel)
+
+### Check backfiller branch for backfilling code
 
 This is the repository for the Leadsquare Activities source connector, written in Python.
 For information about how to use this connector within Airbyte, see [the documentation](https://docs.airbyte.com/integrations/sources/leadsquare-activities).

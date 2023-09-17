@@ -1,4 +1,5 @@
 # Instahyre Job Scrapper Source
+## Powered by Newton Data Engineering Team, Founded By Drumil Patel(weastel)
 
 This is the repository for the Instahyre Job Scrapper source connector, written in Python.
 For information about how to use this connector within Airbyte, see [the documentation](https://docs.airbyte.com/integrations/sources/instahyre-job-scrapper).

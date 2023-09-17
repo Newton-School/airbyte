@@ -23,17 +23,6 @@ from airbyte_cdk.sources import Source
 
 class SourceTechgigJobScrapper(Source):
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
-        """
-        Tests if the input configuration can be used to successfully connect to the integration
-            e.g: if a provided Stripe API token can be used to connect to the Stripe API.
-
-        :param logger: Logging object to display debug/info/error to the logs
-            (logs will not be accessible via airbyte UI if they are not passed to this logger)
-        :param config: Json object containing the configuration of this source, content of this json is as specified in
-        the properties of the spec.yaml file
-
-        :return: AirbyteConnectionStatus indicating a Success or Failure
-        """
         try:
             # Not Implemented
 
@@ -42,22 +31,6 @@ class SourceTechgigJobScrapper(Source):
             return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {str(e)}")
 
     def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
-        """
-        Returns an AirbyteCatalog representing the available streams and fields in this integration.
-        For example, given valid credentials to a Postgres database,
-        returns an Airbyte catalog where each postgres table is a stream, and each table column is a field.
-
-        :param logger: Logging object to display debug/info/error to the logs
-            (logs will not be accessible via airbyte UI if they are not passed to this logger)
-        :param config: Json object containing the configuration of this source, content of this json is as specified in
-        the properties of the spec.yaml file
-
-        :return: AirbyteCatalog is an object describing a list of all available streams in this source.
-            A stream is an AirbyteStream object that includes:
-            - its stream name (or table name in the case of Postgres)
-            - json_schema providing the specifications of expected schema for this stream (a list of columns described
-            by their names and types)
-        """
         streams = []
 
         stream_name = "TableName"  # Example
