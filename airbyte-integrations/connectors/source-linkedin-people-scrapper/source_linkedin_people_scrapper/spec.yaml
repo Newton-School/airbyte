@@ -1,0 +1,23 @@
+documentationUrl: https://docsurl.com
+connectionSpecification:
+  $schema: http://json-schema.org/draft-07/schema#
+  title: Linkedin People Scrapper Spec
+  type: object
+  required:
+    - linkedin_username
+    - linkedin_password
+    - db_password
+    - db_host
+  properties:
+    linkedin_username:
+      type: string
+      description: username to log in linkedin
+    linkedin_password:
+      type: string
+      description: password to log in linkedin
+    db_password:
+      type: string
+      description: db password to log in for db query
+    db_host:
+      type: string
+      description: job analytics db host
