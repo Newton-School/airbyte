@@ -75,7 +75,6 @@ class SourceTechgigJobScrapper(Source):
 
         # Extract Description
         decription_details = about_job_details.find_all('div', class_="content-block-normal")[1]
-        print(decription_details)
         
         new_job_details['job_description_raw_text'] = decription_details.get_text()
         
@@ -86,11 +85,6 @@ class SourceTechgigJobScrapper(Source):
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
         from .job_roles import job_roles
-        job_role_data = {'title': job_role}
-        yield AirbyteMessage(
-            type=Type.RECORD,
-            record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-        )
 
         for job_role in job_roles:
             page_counter = 1

@@ -28,6 +28,8 @@
 </a>
 </p>
 
+#### This is Newton School specific Airbyte Connectors list, all connectors represented in below list are developed by Data Engineering team of Newton School, founded by Drumil Patel(@weastel) and Surendra Puri Goswami(@spgoswami1)
+
 We believe that only an **open-source** solution to data movement can cover the **long tail of data sources** while empowering data engineers to **customize existing connectors**. Our ultimate vision is to help you move data from any source to any destination. Airbyte already provides [300+ connectors](https://docs.airbyte.com/integrations/) for popular APIs, databases, data warehouses, and data lakes.
 
 You can implement Airbyte connectors in any language and take the form of a Docker image that follows the [Airbyte specification](https://docs.airbyte.com/understanding-airbyte/airbyte-protocol/). You can create new connectors very fast with:

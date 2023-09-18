@@ -55,67 +55,75 @@ class SourceInternshalaJobScrapper(Source):
         intershala_individual_beautiful_soup = BeautifulSoup(intershala_response, 'html.parser') \
             .find('div', class_="detail_view")
         
+        new_job_details = {}
+        
         # Extract location
-        job_location = intershala_individual_beautiful_soup.find('p', id='location_names').text.strip()
+        try:
+            new_job_details["job_location"] = intershala_individual_beautiful_soup.find('p', id='location_names').text.strip()
+        except:
+            print("Not Able to Extract Locations")
         
         # Extract CTC
-        ctc_range = intershala_individual_beautiful_soup \
-            .find('div', class_='salary_container') \
-            .find('div', class_='salary') \
-            .find('span', class_='desktop') \
-            .text.strip()
-        ctc_range_split = ctc_range.split('-')
-        min_ctc = ctc_range_split[0].strip()
-        max_ctc = ctc_range_split[1].strip()
+        try:
+            ctc_range = intershala_individual_beautiful_soup \
+                .find('div', class_='salary_container') \
+                .find('div', class_='salary') \
+                .find('span', class_='desktop') \
+                .text.strip()
+            ctc_range_split = ctc_range.split('-')
+            new_job_details["min_ctc"] = ctc_range_split[0].strip()
+            new_job_details["max_ctc"] = ctc_range_split[1].strip()
+        except:
+            print("Not Able to extract CTC")
 
         # Extract Experience
-        experience_range = intershala_individual_beautiful_soup \
-            .find('div', class_='job-experience-item') \
-            .find('div', class_='desktop-text') \
-            .text.strip()
-        experience_range_split = experience_range.split('-')
-        min_experience = experience_range_split[0].strip()
-        max_experience = experience_range_split[1].strip()
+        try:
+            experience_range = intershala_individual_beautiful_soup \
+                .find('div', class_='job-experience-item') \
+                .find('div', class_='desktop-text') \
+                .text.strip()
+            experience_range_split = experience_range.split('-')
+            new_job_details["min_experience"] = experience_range_split[0].strip()
+            new_job_details["max_experience"] = experience_range_split[1].strip()
+        except:
+            print("Not Able to Extract Experience")
 
         # Extract Description
-        description_text = intershala_individual_beautiful_soup.find('div', 'about_company_text_container').text.strip()
+        try:
+            new_job_details["job_description_raw_text"] = intershala_individual_beautiful_soup.find('div', 'about_company_text_container').text.strip()
+        except:
+            print("Not Able to Extract Description")
 
         # Extract Skills
-        skills_heading_div = intershala_individual_beautiful_soup.find('div', 'skills_heading')
+        try:
+            skills_heading_div = intershala_individual_beautiful_soup.find('div', 'skills_heading')
 
-        skill_child_div = skills_heading_div.find_next_sibling('div')
+            skill_child_div = skills_heading_div.find_next_sibling('div')
 
-        skill_required = []
-        for skill in skill_child_div.find_all('span'):
-            skill_required.append(skill.text)
-        
-        new_job_details = {
-            "min_ctc": min_ctc,
-            "max_ctc": max_ctc,
-            "min_experience": min_experience,
-            "max_experience": max_experience,
-            "skills": {
+            skill_required = []
+            for skill in skill_child_div.find_all('span'):
+                skill_required.append(skill.text)
+            new_job_details["skills"] = {
                 "preferredSkills": skill_required
-            },
-            "job_description_raw_text": description_text,
-            "job_location": job_location
-        }
+            }
+        except:
+            print("Not Able to Extract Skills")
 
         return job_openings_obj | new_job_details
+
 
     def read(
         self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]
     ) -> Generator[AirbyteMessage, None, None]:
-        try:
-            from .job_roles import job_roles
+        from .job_roles import job_roles
 
-            for job_role in job_roles:
-                job_role_data = {'title': job_role}
-                yield AirbyteMessage(
-                    type=Type.RECORD,
-                    record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                )
-
+        for job_role in job_roles:
+            job_role_data = {'title': job_role}
+            yield AirbyteMessage(
+                type=Type.RECORD,
+                record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+            )
+            try:
                 job_title_jobs_text = f"{'-'.join(job_role.lower().split())}-jobs"
                 search_parameter_url = f"https://internshala.com/job/get_search_criterias/{job_title_jobs_text}"
                 search_parameter_response = requests.get(search_parameter_url).json()
@@ -130,9 +138,7 @@ class SourceInternshalaJobScrapper(Source):
                     intershala_list_html = intershala_response["internship_list_html"]
                     if int(intershala_response['currentPageCount']) == 0:
                         break
-
                     intershala_beautiful_soup = BeautifulSoup(intershala_list_html, 'html.parser')
-
                     individual_jobs = intershala_beautiful_soup.find_all('div', class_ = "individual_internship")
                     for div_soup in individual_jobs:
                         classnames = div_soup.get('class', [])
@@ -140,7 +146,6 @@ class SourceInternshalaJobScrapper(Source):
                             break
 
                         internship_meta_soup = div_soup.find('div', class_='internship_meta')
-
                         company_name = internship_meta_soup.find('h4', class_='company_name').text.strip()
                         company_data = {"name": company_name}
                         yield AirbyteMessage(
@@ -168,5 +173,5 @@ class SourceInternshalaJobScrapper(Source):
                         )
 
                     page_counter += 1
-        except:
-            print(f"Skipping for {job_role} Job Role")
+            except Exception as e:
+                print(f"Skipping for {job_role} Job Role with error {e}")
