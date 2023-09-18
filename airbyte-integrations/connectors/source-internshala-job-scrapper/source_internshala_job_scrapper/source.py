@@ -39,7 +39,9 @@ class SourceInternshalaJobScrapper(Source):
         """
         try:
             # Not Implemented
-
+            main_text_url = f"https://internshala.com/jobs_ajax/python-developer-jobs"
+            url = f"{main_text_url}/page-1"
+            requests.get(url).json()
             return AirbyteConnectionStatus(status=Status.SUCCEEDED)
         except Exception as e:
             return AirbyteConnectionStatus(status=Status.FAILED, message=f"An exception occurred: {str(e)}")
@@ -48,7 +50,7 @@ class SourceInternshalaJobScrapper(Source):
         from .streams_schema import stream_schema
         return AirbyteCatalog(streams=stream_schema)
     
-    def extract_job_information(job_description_url, job_openings_obj):
+    def extract_job_information(self, job_description_url, job_openings_obj):
         intershala_response =  requests.get(job_description_url).text
         intershala_individual_beautiful_soup = BeautifulSoup(intershala_response, 'html.parser') \
             .find('div', class_="detail_view")
