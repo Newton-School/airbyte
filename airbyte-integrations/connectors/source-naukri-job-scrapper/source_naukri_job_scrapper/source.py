@@ -148,86 +148,7 @@ class SourceNaukriJobScrapper(Source):
     ) -> Generator[AirbyteMessage, None, None]:
 
         config_role = config['job_role']
-
-        url = "https://www.instahyre.com/api/v1/job_search?company_size=0&isLandingPage=true&job_categories=1&job_categories=8" \
-              "&job_categories=10&job_type=0"
-        total_jobs_counts = int(requests.get(url).json()['meta']['total_count'])
-
-        for offset in range(0, total_jobs_counts, 10):
-            new_url = url + f"&offset={offset}"
-            jobs = requests.get(new_url).json()['objects']
-
-            for job in jobs:
-                location_name = job.get('locations') or ""
-                employer = job.get('employer') or ""
-                if employer:
-                    company_name = employer.get('company_name') or ''
-                    company = {
-                        "name": company_name
-                    }
-                    yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(
-                                    stream='companies', data=company, emitted_at=int(datetime.now().timestamp()) * 1000
-                            )
-                    )
-                else:
-                    company_name = ""
-
-                job_url = job.get('public_url') or ''
-
-                if job_url:
-                    job_id = job_url.split("/")[-2].split("-")[1]
-                    job_opening_api_url = f"https://www.instahyre.com/api/v1/employer_public_jobs/{job_id}"
-                    try:
-                        job_response = requests.get(job_opening_api_url).json()
-                    except:
-                        continue
-                    job_opening = {
-                        "job_role": "",
-                        "job_title": job.get('candidate_title') or "",
-                        "min_experience": job_response.get('workex_max') or "",
-                        "max_experience": job_response.get('workex_min') or "",
-                        "job_description_url": job_url,
-                        "skills": {"preferredSkills": job_response.get('keywords') or []},
-                        "min_ctc": "",
-                        "max_ctc": "",
-                        "department": job_response.get('job_category') or "",
-                        "company": company_name,
-                        "job_source": "instahyre",
-                        "job_location": location_name,
-                        "raw_response": job | job_response,
-                        "job_description_url_without_job_id": job_url,
-                        "job_description_raw_text": job_response.get('description') or ""
-                    }
-
-                    yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(
-                                    stream='job_openings', data=job_opening, emitted_at=int(
-                                            datetime.now().timestamp(
-                                            )
-                                    ) * 1000
-                            ),
-                    )
-
-                    recruiter_details = {
-                        "hiring_manager_for_job_link": job_url,
-                        "name": job_response.get('recruiterName') or "",
-                        "company": company_name,
-                        "short_intro": job_response.get('recruiter_designation') or "",
-                        "linkedin_profile_url": f"dummy_{company_name}"
-                    }
-                    yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(
-                                    stream='recruiter_details', data=recruiter_details,
-                                    emitted_at=int(datetime.now().timestamp()) * 1000
-                            ),
-                    )
-                else:
-                    continue
-
+        max_page = config['max_page']
         if config_role == 'dummy':
             job_roles = ["Angular Developer", "Angular JS Developer", "Associate Software Engineer", "Backend Developer", "C# Developer",
                          "C++ Developer", "Developer", "Client-Side Developer", "Embedded Software Developer", "Embedded Software Engineer",
@@ -265,92 +186,6 @@ class SourceNaukriJobScrapper(Source):
                          "Tech Customer Support Engineer", "Technical Support Engineer", "Servicenow Developer", "SharePoint Developer",
                          "Shopify Developer", "Unity Game Developer", "WordPress & Shopify Developer", "WordPress Developer",
                          "Wordpress Web Developer", "Unreal Developer"]
-            for query in job_roles:
-                has_more = True
-                page_no = 0
-                while has_more:
-                    url = f"https://jobseeker-api.hirist.com/v2/jobfeed/-1/v3/search?pageNo={page_no}&query=" \
-                          f"{query}&loc=&minexp=0&maxexp=2&range=0&boost=1"
-                    try:
-                        resp = requests.get(url).json()
-                    except Exception as e:
-                        print(str(e))
-                        break
-                    jobs = resp.get('jobs') or []
-                    for job in jobs:
-                        skills = {"preferredSkills": [], "otherSkills": []}
-                        tags = job.get('tags') or []
-                        for tag in tags:
-                            skill_name = tag.get('name')
-                            is_mandatory = tag.get('isMandatory')
-                            if is_mandatory:
-                                skills['preferredSkills'].append(skill_name)
-                            else:
-                                skills['otherSkills'].append(skill_name)
-
-                        locations = job.get('locations')
-
-                        location_name = locations[0].get('name') if locations else ""
-
-                        company_data = job.get('companyData')
-                        if company_data:
-                            company_name = company_data.get('companyName')
-                            company = {
-                                "name": company_name
-                            }
-
-                            yield AirbyteMessage(
-                                    type=Type.RECORD,
-                                    record=AirbyteRecordMessage(
-                                            stream='companies', data=company, emitted_at=int(datetime.now().timestamp()) * 1000
-                                    )
-                            )
-                        else:
-                            company_name = ""
-
-                        job_opening = {
-                            "job_role": query,
-                            "job_title": job.get('jobdesignation') or "",
-                            "min_experience": job.get('min') or "",
-                            "max_experience": job.get('max') or "",
-                            "job_description_url": job.get('jobDetailUrl') or "",
-                            "skills": skills,
-                            "min_ctc": job.get('minSal') or "",
-                            "max_ctc": job.get('maxSal') or "",
-                            "company": company_name,
-                            "job_source": "hirist",
-                            "job_location": location_name,
-                            "raw_response": job,
-                            "job_description_url_without_job_id": job.get('jobDetailUrl') or "",
-                            "job_description_raw_text": job.get('introText') or ""
-                        }
-
-                        yield AirbyteMessage(
-                                type=Type.RECORD,
-                                record=AirbyteRecordMessage(
-                                        stream='job_openings', data=job_opening, emitted_at=int(datetime.now().timestamp()) * 1000
-                                ),
-                        )
-
-                        recruiter = job.get('recruiter')
-                        if recruiter:
-                            recruiter_details = {
-                                "hiring_manager_for_job_link": job.get('jobDetailUrl'),
-                                "name": recruiter.get('recruiterName'),
-                                "company": company_name,
-                                "short_intro": recruiter.get('designation'),
-                                "linkedin_profile_url": f"dummy_{company_name}"
-                            }
-                            yield AirbyteMessage(
-                                    type=Type.RECORD,
-                                    record=AirbyteRecordMessage(
-                                            stream='recruiter_details', data=recruiter_details,
-                                            emitted_at=int(datetime.now().timestamp()) * 1000
-                                    ),
-                            )
-
-                    has_more = resp.get('hasMore')
-                    page_no += 1
         else:
             job_roles = [config_role]
 
@@ -363,7 +198,8 @@ class SourceNaukriJobScrapper(Source):
 
             response_for_pages = self.get_naukri_request_response(job_role)
             if 'noOfJobs' in response_for_pages:
-                total_pages = response_for_pages['noOfJobs'] // 30
+                # Search only max of 30 Pages(Overloading of information is happening)
+                total_pages = min(response_for_pages['noOfJobs'] // 30, max_page)
             else:
                 total_pages = 1
 
@@ -442,9 +278,9 @@ class SourceNaukriJobScrapper(Source):
                         }
 
                         yield AirbyteMessage(
-                                type=Type.RECORD,
-                                record=AirbyteRecordMessage(
-                                        stream='recruiter_details', data=recruiter_details,
-                                        emitted_at=int(datetime.now().timestamp()) * 1000
-                                ),
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(
+                                stream='recruiter_details', data=recruiter_details,
+                                emitted_at=int(datetime.now().timestamp()) * 1000
+                            ),
                         )

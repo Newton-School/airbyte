@@ -1,10 +1,8 @@
-# Leadsquare Activities Source
+# Internshala Job Scrapper Source
 ## Powered by Newton Data Engineering Team, Founded By Drumil Patel(weastel)
 
-### Check backfiller branch for backfilling code
-
-This is the repository for the Leadsquare Activities source connector, written in Python.
-For information about how to use this connector within Airbyte, see [the documentation](https://docs.airbyte.com/integrations/sources/leadsquare-activities).
+This is the repository for the Internshala Job Scrapper source connector, written in Python.
+For information about how to use this connector within Airbyte, see [the documentation](https://docs.airbyte.com/integrations/sources/internshala-job-scrapper).
 
 ## Local development
 
@@ -35,16 +33,16 @@ should work as you expect.
 #### Building via Gradle
 From the Airbyte repository root, run:
 ```
-./gradlew :airbyte-integrations:connectors:source-leadsquare-activities:build
+./gradlew :airbyte-integrations:connectors:source-internshala-job-scrapper:build
 ```
 
 #### Create credentials
-**If you are a community contributor**, follow the instructions in the [documentation](https://docs.airbyte.com/integrations/sources/leadsquare-activities)
-to generate the necessary credentials. Then create a file `secrets/config.json` conforming to the `source_leadsquare_activities/spec.yaml` file.
+**If you are a community contributor**, follow the instructions in the [documentation](https://docs.airbyte.com/integrations/sources/internshala-job-scrapper)
+to generate the necessary credentials. Then create a file `secrets/config.json` conforming to the `source_internshala_job_scrapper/spec.yaml` file.
 Note that the `secrets` directory is gitignored by default, so there is no danger of accidentally checking in sensitive information.
 See `integration_tests/sample_config.json` for a sample config file.
 
-**If you are an Airbyte core member**, copy the credentials in Lastpass under the secret name `source leadsquare-activities test creds`
+**If you are an Airbyte core member**, copy the credentials in Lastpass under the secret name `source internshala-job-scrapper test creds`
 and place them into `secrets/config.json`.
 
 ### Locally running the connector
@@ -60,7 +58,7 @@ python main.py read --config secrets/config.json --catalog integration_tests/con
 #### Build
 First, make sure you build the latest Docker image:
 ```
-docker build . -t airbyte/source-leadsquare-activities:dev
+docker build . -t airbyte/source-internshala-job-scrapper:dev
 ```
 
 If you want to build the Docker image with the CDK on your local machine (rather than the most recent package published to pypi), from the airbyte base directory run:
@@ -70,7 +68,7 @@ CONNECTOR_TAG=<TAG_NAME> CONNECTOR_NAME=<CONNECTOR_NAME> sh airbyte-integrations
 
 You can also build the connector image via Gradle:
 ```
-./gradlew :airbyte-integrations:connectors:source-leadsquare-activities:airbyteDocker
+./gradlew :airbyte-integrations:connectors:source-internshala-job-scrapper:airbyteDocker
 ```
 When building via Gradle, the docker image name and tag, respectively, are the values of the `io.airbyte.name` and `io.airbyte.version` `LABEL`s in
 the Dockerfile.
@@ -78,10 +76,10 @@ the Dockerfile.
 #### Run
 Then run any of the connector commands as follows:
 ```
-docker run --rm airbyte/source-leadsquare-activities:dev spec
-docker run --rm -v $(pwd)/secrets:/secrets airbyte/source-leadsquare-activities:dev check --config /secrets/config.json
-docker run --rm -v $(pwd)/secrets:/secrets airbyte/source-leadsquare-activities:dev discover --config /secrets/config.json
-docker run --rm -v $(pwd)/secrets:/secrets -v $(pwd)/integration_tests:/integration_tests airbyte/source-leadsquare-activities:dev read --config /secrets/config.json --catalog /integration_tests/configured_catalog.json
+docker run --rm airbyte/source-internshala-job-scrapper:dev spec
+docker run --rm -v $(pwd)/secrets:/secrets airbyte/source-internshala-job-scrapper:dev check --config /secrets/config.json
+docker run --rm -v $(pwd)/secrets:/secrets airbyte/source-internshala-job-scrapper:dev discover --config /secrets/config.json
+docker run --rm -v $(pwd)/secrets:/secrets -v $(pwd)/integration_tests:/integration_tests airbyte/source-internshala-job-scrapper:dev read --config /secrets/config.json --catalog /integration_tests/configured_catalog.json
 ```
 ## Testing
    Make sure to familiarize yourself with [pytest test discovery](https://docs.pytest.org/en/latest/goodpractices.html#test-discovery) to know how your test files and methods should be named.
@@ -115,11 +113,11 @@ To run your integration tests with docker
 All commands should be run from airbyte project root.
 To run unit tests:
 ```
-./gradlew :airbyte-integrations:connectors:source-leadsquare-activities:unitTest
+./gradlew :airbyte-integrations:connectors:source-internshala-job-scrapper:unitTest
 ```
 To run acceptance and custom integration tests:
 ```
-./gradlew :airbyte-integrations:connectors:source-leadsquare-activities:integrationTest
+./gradlew :airbyte-integrations:connectors:source-internshala-job-scrapper:integrationTest
 ```
 
 ## Dependency Management
