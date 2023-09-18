@@ -101,44 +101,47 @@ def extract_job_information(job_description_url, job_openings_obj):
     return job_openings_obj | new_job_details
 
 for job_role in job_roles:
-    job_title_jobs_text = f"{'-'.join(job_role.lower().split())}-jobs"
-    search_parameter_url = f"https://internshala.com/job/get_search_criterias/{job_title_jobs_text}"
-    search_parameter_response = requests.get(search_parameter_url).json()
-    if int(search_parameter_response['location_count']) >= 630:
-        continue
+    try:
+        job_title_jobs_text = f"{'-'.join(job_role.lower().split())}-jobs"
+        search_parameter_url = f"https://internshala.com/job/get_search_criterias/{job_title_jobs_text}"
+        search_parameter_response = requests.get(search_parameter_url).json()
+        if int(search_parameter_response['location_count']) >= 630:
+            continue
 
-    main_text_url = f"https://internshala.com/jobs_ajax/{job_title_jobs_text}"
-    page_counter = 1
-    while True:
-        url = f"{main_text_url}/page-{page_counter}"
-        intershala_response =  requests.get(url).json()
-        intershala_list_html = intershala_response["internship_list_html"]
-        if int(intershala_response['currentPageCount']) == 0:
-            break
-
-        intershala_beautiful_soup = BeautifulSoup(intershala_list_html, 'html.parser')
-
-        individual_jobs = intershala_beautiful_soup.find_all('div', class_ = "individual_internship")
-        for div_soup in individual_jobs:
-            classnames = div_soup.get('class', [])
-            if 'no_result_message' in classnames:
+        main_text_url = f"https://internshala.com/jobs_ajax/{job_title_jobs_text}"
+        page_counter = 1
+        while True:
+            url = f"{main_text_url}/page-{page_counter}"
+            intershala_response =  requests.get(url).json()
+            intershala_list_html = intershala_response["internship_list_html"]
+            if int(intershala_response['currentPageCount']) == 0:
                 break
 
-            internship_meta_soup = div_soup.find('div', class_='internship_meta')
+            intershala_beautiful_soup = BeautifulSoup(intershala_list_html, 'html.parser')
 
-            company_name = internship_meta_soup.find('h4', class_='company_name').text.strip()
-            company_data = {"name": company_name}
-            
-            profile_meta_soup = internship_meta_soup.find('h3', class_='profile')
-            job_title = profile_meta_soup.text.strip()
-            job_description_url = f"https://internshala.com{profile_meta_soup.find('a').get('href')}"
-            job_data = {
-                "job_title": job_title,
-                "job_role": job_role,
-                "job_description_url": job_description_url,
-                "company": company_name,
-                "job_source": "internshala"
-            }
-            print('job_openings', json.dumps(extract_job_information(job_description_url, job_data), indent=4))
+            individual_jobs = intershala_beautiful_soup.find_all('div', class_ = "individual_internship")
+            for div_soup in individual_jobs:
+                classnames = div_soup.get('class', [])
+                if 'no_result_message' in classnames:
+                    break
 
-        page_counter += 1
+                internship_meta_soup = div_soup.find('div', class_='internship_meta')
+
+                company_name = internship_meta_soup.find('h4', class_='company_name').text.strip()
+                company_data = {"name": company_name}
+                
+                profile_meta_soup = internship_meta_soup.find('h3', class_='profile')
+                job_title = profile_meta_soup.text.strip()
+                job_description_url = f"https://internshala.com{profile_meta_soup.find('a').get('href')}"
+                job_data = {
+                    "job_title": job_title,
+                    "job_role": job_role,
+                    "job_description_url": job_description_url,
+                    "company": company_name,
+                    "job_source": "internshala"
+                }
+                print('job_openings', json.dumps(extract_job_information(job_description_url, job_data), indent=4))
+
+            page_counter += 1
+    except:
+        print(f"Skipping {job_role} job role")
