@@ -278,9 +278,9 @@ class SourceNaukriJobScrapper(Source):
                         }
 
                         yield AirbyteMessage(
-                                type=Type.RECORD,
-                                record=AirbyteRecordMessage(
-                                        stream='recruiter_details', data=recruiter_details,
-                                        emitted_at=int(datetime.now().timestamp()) * 1000
-                                ),
+                            type=Type.RECORD,
+                            record=AirbyteRecordMessage(
+                                stream='recruiter_details', data=recruiter_details,
+                                emitted_at=int(datetime.now().timestamp()) * 1000
+                            ),
                         )
