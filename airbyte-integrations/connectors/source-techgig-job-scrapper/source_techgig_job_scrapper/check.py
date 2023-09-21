@@ -38,6 +38,34 @@ job_roles = ["Angular Developer", "Angular JS Developer", "Associate Software En
 import requests
 import json
 from bs4 import BeautifulSoup
+import re
+def extract_experience(experience_string):
+    try:
+        experience_range = experience_string.split('-')
+        min_experience = ''.join(re.findall(r'\d', experience_range[0].strip()))
+        max_experience = ''.join(re.findall(r'\d', experience_range[1].strip()))
+        return min_experience, max_experience
+    except Exception as e:
+        print("Not able to extract experience")
+        return "", ""
+
+def extract_min_max_ctc(salary):
+    min_ctc = 0
+    max_ctc = 0
+    if 'la' in salary.lower() and '-' in salary:
+        try:
+            ctc_range = salary.split("-")
+            
+            min_ctc = ''.join(re.findall(r'\d', ctc_range[0].strip()))
+            max_ctc = ''.join(re.findall(r'\d', ctc_range[1].strip()))
+            if len(str(min_ctc)) > 5:
+                min_ctc = min_ctc / 100000
+            if len(str(max_ctc)) > 5:
+                max_ctc = max_ctc / 100000
+        except Exception as e:
+            print(e)
+            pass
+    return min_ctc, max_ctc
 
 def extract_job_information(job_description_url, job_openings_obj):
     techgig_response =  requests.get(job_description_url).text
@@ -56,31 +84,18 @@ def extract_job_information(job_description_url, job_openings_obj):
     new_job_details['job_location'] = detail_list[1].text.strip()
 
     # Extract CTC
-    try:
-        ctc_range = detail_list[0].text.strip()
-        min_ctc = ctc_range.split('-')[0]
-        max_ctc = ctc_range.split('-')[1]
-        new_job_details['min_ctc'] = min_ctc.strip()
-        new_job_details['max_ctc'] = max_ctc.strip()
-    except:
-        new_job_details['min_ctc'] = detail_list[0].text.strip()
-        print("Unable to Extract CTC")
-
+    ctc_range = detail_list[0].text.strip()
+    print(ctc_range)
+    new_job_details['min_ctc'], new_job_details['max_ctc'] = extract_min_max_ctc(ctc_range)
 
     # Extract Experience
-    try:
-        experience_range = detail_list[2].text.strip()
-        min_experience = experience_range.split('-')[0].strip()
-        max_experience = experience_range.split('-')[1].strip()
-        new_job_details['min_experience'] = min_experience
-        new_job_details['max_experience'] = max_experience
-    except:
-        new_job_details['min_experience'] = detail_list[2].text.strip()
-        print("Unable to Extract CTC")
+    experience_range = detail_list[2].text.strip()
+    min_experience, max_experience = extract_experience(experience_range)
+    new_job_details['min_experience'] = min_experience
+    new_job_details['max_experience'] = max_experience
 
     # Extract Description
     decription_details = about_job_details.find_all('div', class_="content-block-normal")[1]
-    print(decription_details)
     
     new_job_details['job_description_raw_text'] = decription_details.get_text()
     
@@ -116,7 +131,7 @@ for job_role in job_roles:
                         "job_role": job_role,
                         "job_description_url": job_posting_url,
                         "skills": {
-                            "preferredSkills": skill_required,
+                            "preferredSkills": skill_required.split(','),
                         },
                         "company": company_name,
                         "job_source": "techgig"
@@ -124,7 +139,7 @@ for job_role in job_roles:
                     print("Job Openings", json.dumps(extract_job_information(job_posting_url, job_data), indent=4))
                 except:
                     print(f"Unable to Extract Job Openings")
-            
+
             total_jobs += len(job_postings)
             print(page_counter, total_jobs)
             page_counter += 1

@@ -22,6 +22,7 @@ from airbyte_cdk.sources import Source
 from bs4 import BeautifulSoup
 import requests
 import json
+import re
 
 
 class SourceInternshalaJobScrapper(Source):
@@ -50,6 +51,35 @@ class SourceInternshalaJobScrapper(Source):
         from .streams_schema import stream_schema
         return AirbyteCatalog(streams=stream_schema)
     
+    def extract_experience(self, experience_string):
+        try:
+            experience_range = experience_string.split('-')
+            min_experience = ''.join(re.findall(r'\d', experience_range[0].strip()))
+            max_experience = ''.join(re.findall(r'\d', experience_range[1].strip()))
+            return min_experience, max_experience
+        except Exception as e:
+            print("Not able to extract experience")
+            return "", ""
+    
+    @staticmethod
+    def extract_min_max_ctc(salary):
+        min_ctc = 0
+        max_ctc = 0
+        if 'lacs' in salary.lower() and '-' in salary:
+            try:
+                ctc_range = salary.split("-")
+                
+                min_ctc = ''.join(re.findall(r'\d', ctc_range[0].strip()))
+                max_ctc = ''.join(re.findall(r'\d', ctc_range[1].strip()))
+                if len(str(min_ctc)) > 5:
+                    min_ctc = min_ctc / 100000
+                if len(str(max_ctc)) > 5:
+                    max_ctc = max_ctc / 100000
+            except Exception as e:
+                print("Not able to extract ctc")
+                pass
+        return min_ctc, max_ctc
+    
     def extract_job_information(self, job_description_url, job_openings_obj):
         intershala_response =  requests.get(job_description_url).text
         intershala_individual_beautiful_soup = BeautifulSoup(intershala_response, 'html.parser') \
@@ -70,9 +100,7 @@ class SourceInternshalaJobScrapper(Source):
                 .find('div', class_='salary') \
                 .find('span', class_='desktop') \
                 .text.strip()
-            ctc_range_split = ctc_range.split('-')
-            new_job_details["min_ctc"] = ctc_range_split[0].strip()
-            new_job_details["max_ctc"] = ctc_range_split[1].strip()
+            new_job_details["min_ctc"], new_job_details["max_ctc"] = self.extract_min_max_ctc(ctc_range)
         except:
             print("Not Able to extract CTC")
 
@@ -82,9 +110,7 @@ class SourceInternshalaJobScrapper(Source):
                 .find('div', class_='job-experience-item') \
                 .find('div', class_='desktop-text') \
                 .text.strip()
-            experience_range_split = experience_range.split('-')
-            new_job_details["min_experience"] = experience_range_split[0].strip()
-            new_job_details["max_experience"] = experience_range_split[1].strip()
+            new_job_details["min_experience"], new_job_details["max_experience"] =self.extract_experience(experience_range)
         except:
             print("Not Able to Extract Experience")
 
@@ -162,6 +188,7 @@ class SourceInternshalaJobScrapper(Source):
                             "job_title": job_title,
                             "job_role": job_role,
                             "job_description_url": job_description_url,
+                            "job_description_url_without_job_id": job_description_url,
                             "company": company_name,
                             "job_source": "internshala"
                         }

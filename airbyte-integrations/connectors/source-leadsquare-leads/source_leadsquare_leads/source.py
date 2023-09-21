@@ -69,7 +69,13 @@ class SourceLeadsquareLeads(Source):
         "mx_UTM_Referer",
         "mx_UTM_Source",
         "mx_Work_Experience",
-        "mx_Year_of_Passing_in_Text", 
+        "mx_Year_of_Passing_in_Text",
+        "mx_RFD_Date",
+        "mx_doc_collected",
+        "mx_doc_approved",
+        "mx_total_fees",
+        "mx_total_revenue",
+        "mx_cibil_check",
     ]
 
     def get_stream_fields(self):

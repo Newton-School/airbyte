@@ -79,76 +79,78 @@ class SourceInstahyreJobScrapper(Source):
 
         for offset in range(0, total_jobs_counts, 10):
             new_url = url + f"&offset={offset}"
-            jobs = requests.get(new_url).json()['objects']
+            try:               
+                jobs = requests.get(new_url).json()['objects']
 
-            for job in jobs:
-                location_name = job.get('locations') or ""
-                employer = job.get('employer') or ""
-                if employer:
-                    company_name = employer.get('company_name') or ''
-                    company = {
-                        "name": company_name
-                    }
-                    yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(
-                                    stream='companies', data=company, emitted_at=int(datetime.now().timestamp()) * 1000
-                            )
-                    )
-                else:
-                    company_name = ""
+                for job in jobs:
+                    location_name = job.get('locations') or ""
+                    employer = job.get('employer') or ""
+                    if employer:
+                        company_name = employer.get('company_name') or ''
+                        company = {
+                            "name": company_name
+                        }
+                        yield AirbyteMessage(
+                                type=Type.RECORD,
+                                record=AirbyteRecordMessage(
+                                        stream='companies', data=company, emitted_at=int(datetime.now().timestamp()) * 1000
+                                )
+                        )
+                    else:
+                        company_name = ""
 
-                job_url = job.get('public_url') or ''
+                    job_url = job.get('public_url') or ''
 
-                if job_url:
-                    job_id = job_url.split("/")[-2].split("-")[1]
-                    job_opening_api_url = f"https://www.instahyre.com/api/v1/employer_public_jobs/{job_id}"
-                    try:
-                        job_response = requests.get(job_opening_api_url).json()
-                    except:
+                    if job_url:
+                        job_id = job_url.split("/")[-2].split("-")[1]
+                        job_opening_api_url = f"https://www.instahyre.com/api/v1/employer_public_jobs/{job_id}"
+                        try:
+                            job_response = requests.get(job_opening_api_url).json()
+                        except:
+                            continue
+                        job_opening = {
+                            "job_role": "",
+                            "job_title": job.get('candidate_title') or "",
+                            "min_experience": job_response.get('workex_max') or "",
+                            "max_experience": job_response.get('workex_min') or "",
+                            "job_description_url": job_url,
+                            "skills": {"preferredSkills": job_response.get('keywords') or []},
+                            "min_ctc": "",
+                            "max_ctc": "",
+                            "department": job_response.get('job_category') or "",
+                            "company": company_name,
+                            "job_source": "instahyre",
+                            "job_location": location_name,
+                            "raw_response": job | job_response,
+                            "job_description_url_without_job_id": job_url,
+                            "job_description_raw_text": job_response.get('description') or ""
+                        }
+
+                        yield AirbyteMessage(
+                                type=Type.RECORD,
+                                record=AirbyteRecordMessage(
+                                        stream='job_openings', data=job_opening, emitted_at=int(
+                                                datetime.now().timestamp(
+                                                )
+                                        ) * 1000
+                                ),
+                        )
+
+                        recruiter_details = {
+                            "hiring_manager_for_job_link": job_url,
+                            "name": job_response.get('recruiterName') or "",
+                            "company": company_name,
+                            "short_intro": job_response.get('recruiter_designation') or "",
+                            "linkedin_profile_url": f"dummy_{company_name}"
+                        }
+                        yield AirbyteMessage(
+                                type=Type.RECORD,
+                                record=AirbyteRecordMessage(
+                                        stream='recruiter_details', data=recruiter_details,
+                                        emitted_at=int(datetime.now().timestamp()) * 1000
+                                ),
+                        )
+                    else:
                         continue
-                    job_opening = {
-                        "job_role": "",
-                        "job_title": job.get('candidate_title') or "",
-                        "min_experience": job_response.get('workex_max') or "",
-                        "max_experience": job_response.get('workex_min') or "",
-                        "job_description_url": job_url,
-                        "skills": {"preferredSkills": job_response.get('keywords') or []},
-                        "min_ctc": "",
-                        "max_ctc": "",
-                        "department": job_response.get('job_category') or "",
-                        "company": company_name,
-                        "job_source": "instahyre",
-                        "job_location": location_name,
-                        "raw_response": job | job_response,
-                        "job_description_url_without_job_id": job_url,
-                        "job_description_raw_text": job_response.get('description') or ""
-                    }
-
-                    yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(
-                                    stream='job_openings', data=job_opening, emitted_at=int(
-                                            datetime.now().timestamp(
-                                            )
-                                    ) * 1000
-                            ),
-                    )
-
-                    recruiter_details = {
-                        "hiring_manager_for_job_link": job_url,
-                        "name": job_response.get('recruiterName') or "",
-                        "company": company_name,
-                        "short_intro": job_response.get('recruiter_designation') or "",
-                        "linkedin_profile_url": f"dummy_{company_name}"
-                    }
-                    yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(
-                                    stream='recruiter_details', data=recruiter_details,
-                                    emitted_at=int(datetime.now().timestamp()) * 1000
-                            ),
-                    )
-                else:
-                    continue
-
+            except Exception as e:
+                print(f"Got {e} Error While Pulling Data")
