@@ -27,6 +27,10 @@ system_id = "110"
 
 
 class SourceNaukriJobScrapper(Source):
+
+    def random_user_agent(self):
+        return "PostmanRuntime/7.36.3"
+
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the integration
@@ -41,18 +45,19 @@ class SourceNaukriJobScrapper(Source):
         """
         try:
             searchJobType = config['job_role']
-
+            cookie_resp = requests.get('https://www.naukri.com/jobs-in-india')
+            extracted_cookie = cookie_resp.headers.get('Set-Cookie')
             naukriResponse = requests.get(
-
                     'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk',
                     params={
-                        'keyword': searchJobType,
                         'pageNo': 1,
                         'jobAge': 1,
                     },
                     headers={
                         'appid': app_id,
                         'systemid': system_id,
+                        'cookie': extracted_cookie,
+                        'User-Agent': "PostmanRuntime/7.36.3",
                     }
             )
 
@@ -88,8 +93,9 @@ class SourceNaukriJobScrapper(Source):
         updated_string = original_string.replace(string_to_remove, "")
         return updated_string
 
-    @staticmethod
-    def get_naukri_request_response(job_type, page_number=1):
+    def get_naukri_request_response(self, job_type, page_number=1):
+        cookie_resp = requests.get('https://www.naukri.com/jobs-in-india')
+        extracted_cookie = cookie_resp.headers.get('Set-Cookie')
         naukri_response = requests.get(
                 'https://www.naukri.com/jobapi/v3/search?noOfResults=30&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk',
                 params={
@@ -99,7 +105,9 @@ class SourceNaukriJobScrapper(Source):
                 },
                 headers={
                     'appid': app_id,
-                    'systemid': system_id,
+                    'systemid': 'Naukri',
+                    'user-agent': "PostmanRuntime/7.36.3",
+                    'cookie': extracted_cookie
                 }
         )
         if 200 <= naukri_response.status_code < 300:
@@ -186,6 +194,250 @@ class SourceNaukriJobScrapper(Source):
                          "Tech Customer Support Engineer", "Technical Support Engineer", "Servicenow Developer", "SharePoint Developer",
                          "Shopify Developer", "Unity Game Developer", "WordPress & Shopify Developer", "WordPress Developer",
                          "Wordpress Web Developer", "Unreal Developer"]
+        elif config_role == 'analyst':
+            job_roles = [
+                "Analyst",
+                "Analytical",
+                "analytical skill",
+                "Analytical Skills",
+                "Analytics",
+                "BeautifulSoup",
+                "big data",
+                "Bigcommerce",
+                "BIGDATA",
+                "Business analysis",
+                "Business process",
+                "Business Process Management",
+                "Business Requirement Analysis",
+                "Caffe",
+                "cassandra",
+                "Consulting",
+                "CuDNN",
+                "data acquisition",
+                "Data analysis",
+                "Data Architecture",
+                "Data Engineer",
+                "Data Engineering",
+                "Data Factory",
+                "data governance",
+                "Data Loader",
+                "Data Management",
+                "Data Migration",
+                "Data modeling",
+                "Data Models",
+                "data pipeline architecture",
+                "Data processing",
+                "data protection",
+                "Data quality",
+                "data science",
+                "Data validation",
+                "Data verse in PowerAERROR!",
+                "data warehouse",
+                "Data-Binding",
+                "Database Design",
+                "Database management",
+                "Database Schema",
+                "DAX queries",
+                "Db2",
+                "Dynamo Db",
+                "ETL",
+                "ETL design",
+                "Excel",
+                "Hadoop",
+                "IT Security Analyst",
+                "Lambda/function",
+                "mangodb",
+                "microsoft",
+                "Microsoft Azure",
+                "Microsoft azure data factory",
+                "Mongo DB",
+                "MongoDB",
+                "MS Access",
+                "MS Office",
+                "MS SQL",
+                "Ms Sql Database",
+                "Ms Sql Serve",
+                "MSMQ",
+                "MSSQL",
+                "Mysq",
+                "MySQL",
+                "MySQL. HTML",
+                "NLP",
+                "NoSQL",
+                "OpenCV",
+                "Phyton",
+                "Pinecone DB",
+                "PL/SQL",
+                "PLSQL",
+                "Postgres",
+                "Postgresql",
+                "Power BI",
+                "Problem Solving",
+                "Problem Solving & Analytical Skills",
+                "Process Analytics",
+                "PySpark",
+                "Python",
+                "Python Development",
+                "Python Framework",
+                "python progaraming",
+                "RDBMS",
+                "Rdbms Concepts",
+                "RDS",
+                "redshift",
+                "Relational database",
+                "relational databases",
+                "Scala",
+                "scrapy",
+                "scrapy framework",
+                "Spark",
+                "SQL",
+                "SQL Azure",
+                "SQL Database",
+                "sql knowledge",
+                "SQL queries",
+                "SQL Server",
+                "SQL Server ASP.Net",
+                "SQL Server Development",
+                "SQLit",
+                "SQLite",
+                "SQLite Database",
+                "sqs",
+                "SSIS",
+                "SSRS",
+                "Stored procedures",
+                "tableau",
+                "TensorFlow",
+                "Theano",
+                "Torch",
+                "Triggers",
+                "Advanced Excel",
+                "BA",
+                "business Analyst",
+                "Business Analytics",
+                "Business Intelligence (BI)",
+                "data analyst",
+                "data analytics",
+                "data cleansing",
+                "Data Scraping",
+                "Database",
+                "Database Planning",
+                "database structures",
+                "Databases Postgres",
+                "ETL Tool",
+                "Extraction",
+                "Fabrication",
+                "Google Analytics",
+                "H look up",
+                "macros",
+                "Management Information System",
+                "Microsoft applications",
+                "MIS",
+                "MS SQLServer",
+                "MS-Excel",
+                "Nosql Databases",
+                "numpy",
+                "Outlook",
+                "panda",
+                "PowerPoint.",
+                "Qlik",
+                "query",
+                "Regression testing",
+                "Regular Expressions",
+                "spreadsheets",
+                "statistical analyses",
+                "vlook up",
+                "Warehousing",
+                "WCF Data Services",
+                "Word",
+                "AI",
+                "analysis",
+                "Analysts",
+                "Associate Analyst",
+                "bi",
+                "Bi Tools",
+                "BigQuery",
+                "business analyst bpo",
+                "business intelligence",
+                "Business operations",
+                "business process analysis",
+                "business requirements",
+                "Business Research",
+                "Business services",
+                "business system",
+                "Concatenate",
+                "CouchD",
+                "dashboards",
+                "Data collection",
+                "data collection systems",
+                "Data communication",
+                "Data entry operation",
+                "data integrity",
+                "Data Mapping",
+                "data mining",
+                "Data Reporting",
+                "Data Sciences",
+                "data visualization",
+                "Data warehousing",
+                "Database Management System",
+                "Database testing",
+                "DB",
+                "dbms",
+                "deep learning",
+                "excel google analytics",
+                "Google Sheets",
+                "hlookup",
+                "Index Optimization",
+                "IT Business Analyst",
+                "IT Consulting",
+                "IT Management",
+                "IT Operations Management",
+                "looker",
+                "Mango Db",
+                "Marketing analytics",
+                "Marketing operations",
+                "Mathematics",
+                "Memcached",
+                "Microstrategy",
+                "MIS documentation",
+                "Mis Report Preparation",
+                "MIS reporting",
+                "Ms excel",
+                "Natural language processing",
+                "Php And Mysql",
+                "Php Codeigniter",
+                "Pivot",
+                "pivot table",
+                "PL-SQL",
+                "Portfolio management",
+                "postgrest",
+                "Power Query",
+                "Powerpoint",
+                "predictive analytics",
+                "prescriptive analytics",
+                "Python or PHP",
+                "R",
+                "Reporting tools",
+                "Risk analysis",
+                "SAS",
+                "Schema",
+                "Senior Analyst",
+                "Site Analysis",
+                "Snowflake DB",
+                "SPSS",
+                "Statistical process control",
+                "Statistical Tools",
+                "statistics",
+                "System analysis",
+                "Systems Analysis",
+                "T-SQL",
+                "Teradata",
+                "VB SCRIPT",
+                "VBA",
+                "vlookup",
+                "Webmaster",
+                "Website Analysis",
+                "zoho analytics"
+            ]
         else:
             job_roles = [config_role]
 
@@ -205,7 +457,7 @@ class SourceNaukriJobScrapper(Source):
 
             for page in range(1, total_pages):
                 response_for_job = self.get_naukri_request_response(job_role, page)
-
+                
                 for job_resp in response_for_job['jobDetails']:
                     company_data = {"name": job_resp['companyName'].strip()}
                     yield AirbyteMessage(
@@ -225,12 +477,15 @@ class SourceNaukriJobScrapper(Source):
                         'job_description_raw_text': self.remove_html_tags(job_resp['jobDescription'].strip()),
                         'job_source': 'naukri'
                     }
-
+                    cookie_resp = requests.get('https://www.naukri.com/jobs-in-india')
+                    extracted_cookie = cookie_resp.headers.get('Set-Cookie')
                     job_extended_response = requests.get(
                             'https://www.naukri.com/jobapi/v4/job/' + job_resp.get('jobId', ''),
                             headers={
                                 'appid': app_id,
-                                'systemid': system_id,
+                                'systemid': 'Naukri',
+                                'user-agent': "PostmanRuntime/7.36.3",
+                                'cookie': extracted_cookie
                             }
                     )
                     extended_job_details = job_extended_response.json()['jobDetails']

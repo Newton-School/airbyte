@@ -54,7 +54,7 @@ stream_schema = [{
             },
             "job_source": {
                 "type": "string",
-                "enum": ["naukri", "linkedin", "google_jobs"]
+                "enum": ["naukri", "linkedin", "google_jobs", "hirist", "instahyre", "internshala"]
             },
             "is_duplicate": {
                 "type": "boolean",

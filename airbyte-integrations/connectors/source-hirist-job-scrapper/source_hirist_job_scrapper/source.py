@@ -72,6 +72,7 @@ class SourceHiristJobScrapper(Source):
         """
         import requests
         from .job_roles import job_roles
+        counter = 0
         for query in job_roles:
             has_more = True
             page_no = 0
@@ -84,6 +85,7 @@ class SourceHiristJobScrapper(Source):
                     print(str(e))
                     break
                 jobs = resp.get('jobs') or []
+
                 for job in jobs:
                     skills = {"preferredSkills": [], "otherSkills": []}
                     tags = job.get('tags') or []
@@ -117,18 +119,18 @@ class SourceHiristJobScrapper(Source):
 
                     job_opening = {
                         "job_role": query,
-                        "job_title": job.get('jobdesignation') or "",
-                        "min_experience": job.get('min') or "",
-                        "max_experience": job.get('max') or "",
+                        "job_title": job.get('title') or "",
+                        "min_experience": str(job.get('min')) or "",
+                        "max_experience": str(job.get('max')) or "",
                         "job_description_url": job.get('jobDetailUrl') or "",
                         "skills": skills,
-                        "min_ctc": job.get('minSal') or "",
-                        "max_ctc": job.get('maxSal') or "",
+                        "min_ctc": str(job.get('minSal')) or "",
+                        "max_ctc": str(job.get('maxSal')) or "",
                         "company": company_name,
                         "job_source": "hirist",
                         "job_location": location_name,
                         "raw_response": job,
-                        "job_description_url_without_job_id": job.get('jobDetailUrl') or "",
+                        "job_description_url_without_job_id": job.get('id') or "",
                         "job_description_raw_text": job.get('introText') or ""
                     }
 

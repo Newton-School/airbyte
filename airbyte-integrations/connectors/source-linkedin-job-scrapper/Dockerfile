@@ -30,13 +30,6 @@ RUN echo "Etc/UTC" > /etc/timezone
 # bash is installed for more convenient debugging.
 RUN apk --no-cache add bash
 
-# copy payload code only
-COPY main.py ./
-COPY source_linkedin_job_scrapper ./source_linkedin_job_scrapper
-
-ENV AIRBYTE_ENTRYPOINT "python /airbyte/integration_code/main.py"
-ENTRYPOINT ["python", "/airbyte/integration_code/main.py"]
-
 RUN apk add \
     dumb-init \
     chromium \
@@ -44,6 +37,13 @@ RUN apk add \
 
 ENV CHROME_BIN=/usr/lib/chromium/chrome \
     CHROME_DRIVER_PATH=/usr/lib/chromium/chromedriver
+
+# copy payload code only
+COPY main.py ./
+COPY source_linkedin_job_scrapper ./source_linkedin_job_scrapper
+
+ENV AIRBYTE_ENTRYPOINT "python /airbyte/integration_code/main.py"
+ENTRYPOINT ["python", "/airbyte/integration_code/main.py"]
 
 LABEL io.airbyte.version=0.1.0
 LABEL io.airbyte.name=airbyte/source-linkedin-job-scrapper

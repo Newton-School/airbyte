@@ -64,6 +64,7 @@ job_level_keys = {
 
 
 class SourceLinkedinJobScrapper(Source):
+    driver = None
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the integration
@@ -93,35 +94,35 @@ class SourceLinkedinJobScrapper(Source):
         soup = BeautifulSoup(response.content, "html.parser")
         return soup
 
-    @staticmethod
-    def infinite_scroll(url, scroll_times, button_class_name, driver_required=True):
+    def infinite_scroll(self, url, scroll_times, button_class_name, driver_required=True):
         if driver_required:
-            driver.get(url)
+            self.driver.get(url)
         time.sleep(2)
         scroll_times = scroll_times
         for i in range(scroll_times):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             try:
                 if driver_required:
-                    button = WebDriverWait(driver, 0).until(
+                    button = WebDriverWait(self.driver, 0).until(
                         EC.presence_of_element_located((By.CLASS_NAME, button_class_name)))
                     button.click()
                 else:
-                    button = WebDriverWait(driver, 0).until(EC.element_to_be_clickable((By.CLASS_NAME, button_class_name)))
+                    button = WebDriverWait(self.driver, 0).until(EC.element_to_be_clickable((By.CLASS_NAME, button_class_name)))
                     button.click()
             except:
                 pass
             time.sleep(1)
 
-        html = driver.page_source
+        html = self.driver.page_source
         if driver_required:
-            driver.close()
+            self.driver.close()
         return html
 
     def get_scroll_time_count(self, url, tag_name, class_name, denominator):
         try:
             soup = self.create_soup(url)
-            tag = soup.find(tag_name, class_=class_name)
+            tag = soup.find('span', class_='results-context-header__job-count')
+            # print("Tag New", soup.find_all('span'))
             print("tag", tag, url)
             results_text = tag.text
             numeric_part = re.findall(r'\d+', results_text)[0]
@@ -133,7 +134,7 @@ class SourceLinkedinJobScrapper(Source):
                 return int(int(numeric_part2) / denominator)
             return int(int(numeric_part) / denominator)
         except:
-            return 0
+            return 1
 
     def get_all_jobs_jd_links(self, job_role="Software%20Engineer", location="India", job_type="full_time", past_time="day",
                               job_level="entry_level"):
@@ -508,6 +509,8 @@ class SourceLinkedinJobScrapper(Source):
             job_roles = [config_role]
 
         for job_role in job_roles:
+            self.driver = webdriver.Chrome(executable_path=os.getenv("CHROME_DRIVER_PATH"), options=chrome_options)
+
             job_role_data = {'title': job_role}
             yield AirbyteMessage(
                 type=Type.RECORD,
@@ -516,10 +519,8 @@ class SourceLinkedinJobScrapper(Source):
             try:
                 jd_links = self.get_all_jobs_jd_links(job_role=job_role)
             except Exception as e:
-                logger.info("failed", job_role, str(e))
+                logger.info("failed jd link", job_role, str(e))
                 jd_links = []
-            logger.info(jd_links)
-            logger.info(len(jd_links))
             for jd_link in jd_links:
                 job_details = {
                     'job_description_url': jd_link,
@@ -563,14 +564,14 @@ class SourceLinkedinJobScrapper(Source):
                         html_content = div.decode_contents()
                         job_details['job_description_raw_text'] = self.remove_html_tags(html_content.strip())
 
-                    ul_tag = soup.find("ul", class_=lambda x: x and "description__job-criteria-list" in x.split())
-                    li_tags = ul_tag.find_all("li")
-                    for li in li_tags:
-                        h3_tag = li.find("h3")
-                        h3_text = h3_tag.get_text(strip=True) if h3_tag else ""
-                        span_tag = li.find("span")
-                        span_text = span_tag.get_text(strip=True) if span_tag else ""
-                        job_details[h3_text] = span_text
+                    # ul_tag = soup.find("ul", class_=lambda x: x and "description__job-criteria-list" in x.split())
+                    # li_tags = ul_tag.find_all("li")
+                    # for li in li_tags:
+                    #     h3_tag = li.find("h3")
+                    #     h3_text = h3_tag.get_text(strip=True) if h3_tag else ""
+                    #     span_tag = li.find("span")
+                    #     span_text = span_tag.get_text(strip=True) if span_tag else ""
+                    #     job_details[h3_text] = span_text
 
                     yield AirbyteMessage(
                         type=Type.RECORD,
@@ -586,7 +587,6 @@ class SourceLinkedinJobScrapper(Source):
                         ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
                                                                                     config['open_ai_api_key'], model_engine='gpt-4')
                     job_details = job_details | ai_response
-                    logger.info("succeeded", jd_link)
                     yield AirbyteMessage(
                         type=Type.RECORD,
                         record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
