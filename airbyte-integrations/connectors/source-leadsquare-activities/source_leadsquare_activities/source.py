@@ -20,6 +20,7 @@ from airbyte_cdk.models import (
     Type,
 )
 from airbyte_cdk.sources import Source
+from airbyte_protocol.models import AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
 
 
 class SourceLeadsquareActivities(Source):
@@ -254,3 +255,15 @@ class SourceLeadsquareActivities(Source):
                 current_datetime = current_datetime + timedelta(hours=1)
         except Exception as e:
             logger.error(f'Error while running activity query: {str(e)}')
+
+        yield AirbyteMessage(
+            type=Type.STATE,
+            state=AirbyteStateMessage(
+                type=AirbyteStateType.STREAM,
+                stream=AirbyteStreamState(
+                    stream_descriptor=StreamDescriptor(
+                        name=stream_name
+                    )
+                ),
+            )
+        )
