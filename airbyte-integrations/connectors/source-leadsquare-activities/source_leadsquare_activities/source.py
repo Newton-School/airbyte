@@ -15,11 +15,14 @@ from airbyte_cdk.models import (
     AirbyteConnectionStatus,
     AirbyteMessage,
     AirbyteRecordMessage,
+    AirbyteStateMessage,
     ConfiguredAirbyteCatalog,
     Status,
     Type,
 )
+from airbyte_cdk.sources.streams import IncrementalMixin, Stream
 from airbyte_cdk.sources import Source
+from airbyte_protocol.models import AirbyteStateType, AirbyteStreamState, StreamDescriptor
 
 
 class SourceLeadsquareActivities(Source):
@@ -186,7 +189,7 @@ class SourceLeadsquareActivities(Source):
 
         current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
         current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
-
+        latest_activity_id = ""
         try:
             page_index = 1
             while True:
@@ -231,6 +234,7 @@ class SourceLeadsquareActivities(Source):
                             "sessionId": leadsquare_activities.get('SessionId', ''),
                             "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
                         }
+                        latest_activity_id = leadsquare_activities['Id']
 
                         yield AirbyteMessage(
                             type=Type.RECORD,
@@ -241,5 +245,17 @@ class SourceLeadsquareActivities(Source):
                 else:
                     logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
                     break
+                print(f"Yield Message: {latest_activity_id}")
+                yield AirbyteMessage(
+                    type=Type.STATE,
+                    state=AirbyteStateMessage(
+                        type=AirbyteStateType.STREAM,
+                        stream=AirbyteStreamState(
+                            stream_descriptor=StreamDescriptor(
+                                name=stream_name
+                            )
+                        ),
+                    )
+                )
         except Exception as e:
             logger.error(f'Error while running activity query: {str(e)}')
