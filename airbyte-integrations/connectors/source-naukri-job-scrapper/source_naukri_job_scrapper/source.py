@@ -21,6 +21,7 @@ from airbyte_cdk.models import (
     Type,
 )
 from airbyte_cdk.sources import Source
+from airbyte_protocol.models import AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
 
 app_id = "110"
 system_id = "110"
@@ -539,3 +540,16 @@ class SourceNaukriJobScrapper(Source):
                                 emitted_at=int(datetime.now().timestamp()) * 1000
                             ),
                         )
+
+        for stream_name in ["companies", "job_openings", "recruiter_details", "job_roles"]:
+            yield AirbyteMessage(
+                type=Type.STATE,
+                state=AirbyteStateMessage(
+                    type=AirbyteStateType.STREAM,
+                    stream=AirbyteStreamState(
+                        stream_descriptor=StreamDescriptor(
+                            name=stream_name
+                        )
+                    ),
+                )
+            )

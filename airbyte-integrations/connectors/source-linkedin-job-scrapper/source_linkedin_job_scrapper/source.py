@@ -21,6 +21,7 @@ from airbyte_cdk.models import (
 from airbyte_cdk.sources import Source
 import re
 import requests
+from airbyte_protocol.models import AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
 from bs4 import BeautifulSoup
 import time
 from selenium import webdriver
@@ -614,3 +615,16 @@ class SourceLinkedinJobScrapper(Source):
                         type=Type.RECORD,
                         record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),
                     )
+
+        for stream_name in ["companies", "job_openings", "recruiter_details", "job_roles"]:
+            yield AirbyteMessage(
+                type=Type.STATE,
+                state=AirbyteStateMessage(
+                    type=AirbyteStateType.STREAM,
+                    stream=AirbyteStreamState(
+                        stream_descriptor=StreamDescriptor(
+                            name=stream_name
+                        )
+                    ),
+                )
+            )

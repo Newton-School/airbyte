@@ -18,6 +18,7 @@ from airbyte_cdk.models import (
     Status,
     Type,
 )
+from airbyte_protocol.models import AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
 from airbyte_cdk.sources import Source
 
 
@@ -154,3 +155,16 @@ class SourceInstahyreJobScrapper(Source):
                         continue
             except Exception as e:
                 print(f"Got {e} Error While Pulling Data")
+
+        for stream_name in ["companies", "job_openings", "recruiter_details", "job_roles"]:
+            yield AirbyteMessage(
+                type=Type.STATE,
+                state=AirbyteStateMessage(
+                    type=AirbyteStateType.STREAM,
+                    stream=AirbyteStreamState(
+                        stream_descriptor=StreamDescriptor(
+                            name=stream_name
+                        )
+                    ),
+                )
+            )

@@ -22,6 +22,8 @@ from airbyte_cdk.models import (
     Status,
     Type,
 )
+from airbyte_protocol.models import AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
+
 from airbyte_cdk.sources import Source
 
 
@@ -180,3 +182,15 @@ class SourceGlassdoorJobScrapper(Source):
                             )
                 except Exception as e:
                     print("Getting error white extracting server", e)
+        for stream_name in ["companies", "job_openings", "recruiter_details", "job_roles"]:
+            yield AirbyteMessage(
+                type=Type.STATE,
+                state=AirbyteStateMessage(
+                    type=AirbyteStateType.STREAM,
+                    stream=AirbyteStreamState(
+                        stream_descriptor=StreamDescriptor(
+                            name=stream_name
+                        )
+                    ),
+                )
+            )
