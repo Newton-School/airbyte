@@ -78,6 +78,10 @@ class SourceLeadsquareLeads(Source):
         "mx_total_fees",
         "mx_total_revenue",
         "mx_cibil_check",
+        "mx_ICP",
+        "mx_Identifer",
+        "mx_Organic_Inbound",
+        "mx_Entrance_exam_Marks"
     ]
 
     def get_stream_fields(self):

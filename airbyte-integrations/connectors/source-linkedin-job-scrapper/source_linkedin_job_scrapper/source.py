@@ -610,7 +610,6 @@ class SourceLinkedinJobScrapper(Source):
                         )
                 except Exception as e:
                     logger.info("failed", jd_link, str(e))
-
                     yield AirbyteMessage(
                         type=Type.RECORD,
                         record=AirbyteRecordMessage(stream='job_openings', data=job_details, emitted_at=int(datetime.now().timestamp()) * 1000),

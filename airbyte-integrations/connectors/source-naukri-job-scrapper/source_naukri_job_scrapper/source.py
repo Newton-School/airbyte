@@ -540,7 +540,6 @@ class SourceNaukriJobScrapper(Source):
                                 emitted_at=int(datetime.now().timestamp()) * 1000
                             ),
                         )
-
         for stream_name in ["companies", "job_openings", "recruiter_details", "job_roles"]:
             yield AirbyteMessage(
                 type=Type.STATE,
