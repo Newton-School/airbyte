@@ -109,11 +109,6 @@ class SourceLeadsquareLeads(Source):
             access_key = config['leadsquare-access-key']
             secret_key = config['leadsquare-secret-key']
 
-            current_datetime = datetime.now()
-
-            current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(days=1)
-            current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(days=1)
-
             leadsquare_response = requests.post(
                 url=f'{request_host}/v2/LeadManagement.svc/Leads.Get?',
                 params={
@@ -209,11 +204,10 @@ class SourceLeadsquareLeads(Source):
         access_key = config['leadsquare-access-key']
         secret_key = config['leadsquare-secret-key']
 
-        current_datetime = datetime.now()
-
-        try:
-            page_index = 1
-            while True:
+        page_index = 1
+        error_count = 0
+        while True:
+            try:
                 leadsquare_response = requests.post(
                     url=f'{request_host}/v2/LeadManagement.svc/Leads.Get',
                     params={
@@ -234,10 +228,9 @@ class SourceLeadsquareLeads(Source):
                         }
                     }
                 )
-
                 if 200 <= leadsquare_response.status_code < 300:
-
                     if len(leadsquare_response.json()) == 0:
+                        logger.info(f'|||||||||||No more leads to fetch. Exiting||||||||||||')
                         break
 
                     for leadsquare_leads in leadsquare_response.json():
@@ -250,12 +243,17 @@ class SourceLeadsquareLeads(Source):
                             record=AirbyteRecordMessage(stream=stream_name, data=lead_data, emitted_at=int(datetime.now().timestamp()) * 1000),
                         )
                 else:
-                    logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
-                    break
+                    error_count+=1
+                    if error_count > 10:
+                        break
+                    else:
+                        logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
+                        time.sleep(5)
+                        continue
                 time.sleep(5)
                 page_index += 1
-        except Exception as e:
-            logger.error(f'Error while running activity query: {str(e)}')
+            except Exception as e:
+                logger.error(f'Error while running activity query: {str(e)}')
 
         yield AirbyteMessage(
             type=Type.STATE,
