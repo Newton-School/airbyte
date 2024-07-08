@@ -81,7 +81,11 @@ class SourceLeadsquareLeads(Source):
         "mx_ICP",
         "mx_Identifer",
         "mx_Organic_Inbound",
-        "mx_Entrance_exam_Marks"
+        "mx_Entrance_exam_Marks",
+        "mx_Lead_Quality_Grade",
+        "mx_Lead_Inherent_Intent",
+        "mx_Test_Date_n_Time",
+        "mx_Lead_Type"
     ]
 
     def get_stream_fields(self):
@@ -217,7 +221,7 @@ class SourceLeadsquareLeads(Source):
                     json={
                         "Paging": {
                             "PageIndex": page_index,
-                            "PageSize": 10000
+                            "PageSize": 1000
                         },
                         "Columns": {
                             "Include_CSV": ','.join(self.required_fields)
