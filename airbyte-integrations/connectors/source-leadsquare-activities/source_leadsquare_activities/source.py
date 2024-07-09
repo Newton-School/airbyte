@@ -20,6 +20,7 @@ from airbyte_cdk.models import (
     Type,
 )
 from airbyte_cdk.sources import Source
+from airbyte_protocol.models import AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
 
 
 class SourceLeadsquareActivities(Source):
@@ -181,6 +182,8 @@ class SourceLeadsquareActivities(Source):
         request_host = config['leadsquare-host']
         access_key = config['leadsquare-access-key']
         secret_key = config['leadsquare-secret-key']
+        start_date = config['backfiller-start-date']
+        end_date = config['backfiller-end-date']
 
         current_datetime = datetime.now()
 
@@ -188,58 +191,77 @@ class SourceLeadsquareActivities(Source):
         current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
 
         try:
-            page_index = 1
-            while True:
-                leadsquare_response = requests.post(
-                    url=f'{request_host}/v2/ProspectActivity.svc/RetrieveRecentlyModified',
-                    params={
-                        "accessKey": access_key,
-                        "secretKey": secret_key,
-                    },
-                    json={
-                        "Parameter": {
-                            "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                            "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                            "IncludeCustomFields": 1
+            start_timestamp = datetime.strptime(start_date, "%Y-%m-%d")
+            end_timestamp = datetime.strptime(end_date, "%Y-%m-%d")
+            current_datetime = start_timestamp
+            while current_datetime < end_timestamp:
+                page_index = 1
+                while True:
+                    current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+                    current_end_hour_timestamp = current_datetime.replace(minute=59, second=59, microsecond=999) - timedelta(hours=1)
+                    leadsquare_response = requests.post(
+                        url=f'{request_host}/v2/ProspectActivity.svc/RetrieveRecentlyModified',
+                        params={
+                            "accessKey": access_key,
+                            "secretKey": secret_key,
                         },
-                        "Paging": {
-                            "PageIndex": page_index,
-                            "PageSize": 1000
-                        },
-                        "Sorting": {
-                            "ColumnName": "CreatedOn",
-                            "Direction": 1
+                        json={
+                            "Parameter": {
+                                "FromDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                                "ToDate": current_end_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                                "IncludeCustomFields": 1
+                            },
+                            "Paging": {
+                                "PageIndex": page_index,
+                                "PageSize": 1000
+                            },
+                            "Sorting": {
+                                "ColumnName": "CreatedOn",
+                                "Direction": 1
+                            }
                         }
-                    }
-                )
+                    )
 
-                if 200 <= leadsquare_response.status_code < 300:
-                    if len(leadsquare_response.json()['ProspectActivities']) == 0:
+                    if 200 <= leadsquare_response.status_code < 300:
+                        if len(leadsquare_response.json()['ProspectActivities']) == 0:
+                            break
+                        for leadsquare_activities in leadsquare_response.json()['ProspectActivities']:
+                            lead_activity_data = {
+                                "activityId": leadsquare_activities['Id'],
+                                "eventCode": leadsquare_activities['EventCode'],
+                                "eventName": leadsquare_activities['EventName'],
+                                "createdOn": leadsquare_activities['CreatedOn'],
+                                "modifiedOn": leadsquare_activities['ModifiedOn'],
+                                "activityScore": leadsquare_activities['ActivityScore'],
+                                "activityType": leadsquare_activities['ActivityType'],
+                                "type": leadsquare_activities['Type'],
+                                "relatedProspectId": leadsquare_activities['RelatedProspectId'],
+                                "activityData": leadsquare_activities.get('Data', {}) if leadsquare_activities.get('Data', {}) else {},
+                                "sessionId": leadsquare_activities.get('SessionId', ''),
+                                "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
+                            }
+
+                            yield AirbyteMessage(
+                                type=Type.RECORD,
+                                record=AirbyteRecordMessage(stream=stream_name, data=lead_activity_data, emitted_at=int(datetime.now().timestamp()) * 1000),
+                            )
+                    else:
+                        logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
                         break
-                    for leadsquare_activities in leadsquare_response.json()['ProspectActivities']:
-                        lead_activity_data = {
-                            "activityId": leadsquare_activities['Id'],
-                            "eventCode": leadsquare_activities['EventCode'],
-                            "eventName": leadsquare_activities['EventName'],
-                            "createdOn": leadsquare_activities['CreatedOn'],
-                            "modifiedOn": leadsquare_activities['ModifiedOn'],
-                            "activityScore": leadsquare_activities['ActivityScore'],
-                            "activityType": leadsquare_activities['ActivityType'],
-                            "type": leadsquare_activities['Type'],
-                            "relatedProspectId": leadsquare_activities['RelatedProspectId'],
-                            "activityData": leadsquare_activities.get('Data', {}) if leadsquare_activities.get('Data', {}) else {},
-                            "sessionId": leadsquare_activities.get('SessionId', ''),
-                            "activityCustomFields": leadsquare_activities.get('Fields', {}) if leadsquare_activities.get('Fields', {}) else {},
-                        }
-
-                        yield AirbyteMessage(
-                            type=Type.RECORD,
-                            record=AirbyteRecordMessage(stream=stream_name, data=lead_activity_data, emitted_at=int(datetime.now().timestamp()) * 1000),
-                        )
-                        time.sleep(5)
-                        page_index += 1
-                else:
-                    logger.error(f'LeadSquare Response Threw {leadsquare_response.status_code} with {leadsquare_response.status_code}')
-                    break
+                    time.sleep(1)
+                    print("requesting ended", page_index, "for", current_datetime)
+                    page_index += 1
+                current_datetime = current_datetime + timedelta(hours=1)
         except Exception as e:
             logger.error(f'Error while running activity query: {str(e)}')
+        yield AirbyteMessage(
+            type=Type.STATE,
+            state=AirbyteStateMessage(
+                type=AirbyteStateType.STREAM,
+                stream=AirbyteStreamState(
+                    stream_descriptor=StreamDescriptor(
+                        name=stream_name
+                    )
+                ),
+            )
+        )
