@@ -219,11 +219,23 @@ class SourceLeadsquareLeads(Source):
         request_host = config['leadsquare-host']
         access_key = config['leadsquare-access-key']
         secret_key = config['leadsquare-secret-key']
+        start_timestamp_string = config['backfiller-start-date'] if 'backfiller-start-date' in config else None
+        end_timestamp_string = config['backfiller-end-date'] if 'backfiller-end-date' in config else None
+
+        if start_timestamp_string and end_timestamp_string:
+            start_timestamp = datetime.strptime(start_timestamp_string, '%Y-%m-%d %H:%M:%S')
+            end_timestamp = datetime.strptime(end_timestamp_string, '%Y-%m-%d %H:%M:%S')
+            if start_timestamp > end_timestamp:
+                raise Exception('Start timestamp cannot be greater than end timestamp')
+        else:
+            current_datetime = datetime.now(timezone.utc)
+            current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
+            start_timestamp = current_start_hour_timestamp - timedelta(hours=1)
+            end_timestamp = current_start_hour_timestamp
+
 
         page_index = 1
         error_count = 0
-        current_datetime = datetime.now(timezone.utc)
-        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
         while True:
             try:
                 leadsquare_response = requests.post(
@@ -234,8 +246,8 @@ class SourceLeadsquareLeads(Source):
                     },
                     json={
                         "Parameter": {
-                            "FromDate": (current_start_hour_timestamp - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'),
-                            "ToDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                            "FromDate": start_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                            "ToDate": end_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                         },
                         "Columns": {
                             "Include_CSV": ','.join(self.required_fields),

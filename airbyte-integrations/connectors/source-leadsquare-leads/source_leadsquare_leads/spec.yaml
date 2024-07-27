@@ -17,3 +17,11 @@ connectionSpecification:
     leadsquare-secret-key:
       type: string
       description: leadsquare secret key
+    backfiller-start-timestamp:
+      type: string
+      description: backfiller start tiestamp (YYYY-MM-DD HH:MM:SS)
+      pattern: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$'
+    backfiller-end-timestamp:
+      type: string
+      description: backfiller end timestamp (YYYY-MM-DD HH:MM:SS)
+      pattern: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$'
