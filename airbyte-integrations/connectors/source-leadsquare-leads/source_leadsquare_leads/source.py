@@ -4,7 +4,7 @@
 
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Generator
 import time
 
@@ -96,6 +96,12 @@ class SourceLeadsquareLeads(Source):
             }
         return stream_fields
 
+    def get_lead_property_from_leadsquare_lead(attribute, leadsquare_lead):
+        for lead_property in leadsquare_lead['LeadPropertyList']:
+            if lead_property['Attribute'] == attribute:
+                return lead_property['Value']
+        return ''
+
     def check(self, logger: AirbyteLogger, config: json) -> AirbyteConnectionStatus:
         """
         Tests if the input configuration can be used to successfully connect to the integration
@@ -108,28 +114,34 @@ class SourceLeadsquareLeads(Source):
 
         :return: AirbyteConnectionStatus indicating a Success or Failure
         """
+        current_datetime = datetime.now(timezone.utc)
+        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
         try:
             request_host = config['leadsquare-host']
             access_key = config['leadsquare-access-key']
             secret_key = config['leadsquare-secret-key']
 
             leadsquare_response = requests.post(
-                url=f'{request_host}/v2/LeadManagement.svc/Leads.Get?',
+                url=f'{request_host}/LeadManagement.svc/Leads.RecentlyModified',
                 params={
                     "accessKey": access_key,
                     "secretKey": secret_key,
                 },
                 json={
-                    "Paging": {
-                        "PageIndex": 1,
-                        "PageSize": 1
+                    "Parameter": {
+                        "FromDate": (current_start_hour_timestamp - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'),
+                        "ToDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     },
                     "Columns": {
-                        "Include_CSV": ','.join(self.required_fields)
+                        "Include_CSV": ','.join(self.required_fields),
+                    },
+                    "Paging": {
+                        "PageIndex": 1,
+                        "PageSize": 5000
                     },
                     "Sorting": {
-                        "ColumnName": "CreatedOn",
-                        "Direction": 1
+                        "ColumnName": "ModifiedOn",
+                        "Direction": "1"
                     }
                 }
             )
@@ -210,38 +222,46 @@ class SourceLeadsquareLeads(Source):
 
         page_index = 1
         error_count = 0
+        current_datetime = datetime.now(timezone.utc)
+        current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
         while True:
             try:
                 leadsquare_response = requests.post(
-                    url=f'{request_host}/v2/LeadManagement.svc/Leads.Get',
+                    url=f'{request_host}/LeadManagement.svc/Leads.RecentlyModified',
                     params={
                         "accessKey": access_key,
                         "secretKey": secret_key,
                     },
                     json={
-                        "Paging": {
-                            "PageIndex": page_index,
-                            "PageSize": 1000
+                        "Parameter": {
+                            "FromDate": (current_start_hour_timestamp - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S'),
+                            "ToDate": current_start_hour_timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                         },
                         "Columns": {
-                            "Include_CSV": ','.join(self.required_fields)
+                            "Include_CSV": ','.join(self.required_fields),
+                        },
+                        "Paging": {
+                            "PageIndex": page_index,
+                            "PageSize": 5000
                         },
                         "Sorting": {
-                            "ColumnName": "CreatedOn",
-                            "Direction": 1
+                            "ColumnName": "ModifiedOn",
+                            "Direction": "1"
                         }
                     }
                 )
                 if 200 <= leadsquare_response.status_code < 300:
-                    if len(leadsquare_response.json()) == 0:
+                    leadsquare_response_json = leadsquare_response.json()
+                    record_count = leadsquare_response_json['RecordCount']
+                    if record_count == 0:
                         logger.info(f'|||||||||||No more leads to fetch. Exiting||||||||||||')
                         break
-
-                    for leadsquare_leads in leadsquare_response.json():
-                        lead_data = {}
-                        for lead_property in self.required_fields:
-                            lead_data[lead_property] = leadsquare_leads.get(lead_property,"")
-
+                    leadsquare_leads = leadsquare_response_json['Leads']
+                    for leadsquare_lead in leadsquare_leads:
+                        lead_data = {
+                            lead_property: self.get_lead_property_from_leadsquare_lead(lead_property, leadsquare_lead) 
+                            for lead_property in self.required_fields
+                        }
                         yield AirbyteMessage(
                             type=Type.RECORD,
                             record=AirbyteRecordMessage(stream=stream_name, data=lead_data, emitted_at=int(datetime.now().timestamp()) * 1000),
@@ -258,7 +278,6 @@ class SourceLeadsquareLeads(Source):
                 page_index += 1
             except Exception as e:
                 logger.error(f'Error while running activity query: {str(e)}')
-
         yield AirbyteMessage(
             type=Type.STATE,
             state=AirbyteStateMessage(
