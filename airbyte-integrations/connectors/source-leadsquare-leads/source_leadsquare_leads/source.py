@@ -91,12 +91,17 @@ class SourceLeadsquareLeads(Source):
     def get_stream_fields(self):
         stream_fields = {}
         for field_name in self.required_fields:
-            stream_fields[field_name] = {
-                "type": ["string", "null"],
-            }
+            if field_name == 'ProspectID':
+                stream_fields['ProspectId'] = {
+                    "type": "string",
+                    }
+            else:
+                stream_fields[field_name] = {
+                    "type": ["string", "null"],
+                    }
         return stream_fields
 
-    def get_lead_property_from_leadsquare_lead(attribute, leadsquare_lead):
+    def get_lead_property_from_leadsquare_lead(self, attribute, leadsquare_lead):
         for lead_property in leadsquare_lead['LeadPropertyList']:
             if lead_property['Attribute'] == attribute:
                 return lead_property['Value']
@@ -122,7 +127,7 @@ class SourceLeadsquareLeads(Source):
             secret_key = config['leadsquare-secret-key']
 
             leadsquare_response = requests.post(
-                url=f'{request_host}/LeadManagement.svc/Leads.RecentlyModified',
+                url=f'{request_host}/v2/LeadManagement.svc/Leads.RecentlyModified',
                 params={
                     "accessKey": access_key,
                     "secretKey": secret_key,
@@ -219,27 +224,30 @@ class SourceLeadsquareLeads(Source):
         request_host = config['leadsquare-host']
         access_key = config['leadsquare-access-key']
         secret_key = config['leadsquare-secret-key']
-        start_timestamp_string = config['backfiller-start-date'] if 'backfiller-start-date' in config else None
-        end_timestamp_string = config['backfiller-end-date'] if 'backfiller-end-date' in config else None
-
+        start_timestamp_string = config['backfiller-start-timestamp'] if 'backfiller-start-timestamp' in config else None
+        end_timestamp_string = config['backfiller-end-timestamp'] if 'backfiller-end-timestamp' in config else None
         if start_timestamp_string and end_timestamp_string:
             start_timestamp = datetime.strptime(start_timestamp_string, '%Y-%m-%d %H:%M:%S')
             end_timestamp = datetime.strptime(end_timestamp_string, '%Y-%m-%d %H:%M:%S')
             if start_timestamp > end_timestamp:
                 raise Exception('Start timestamp cannot be greater than end timestamp')
         else:
+            # Get current datetime in UTC
             current_datetime = datetime.now(timezone.utc)
-            current_start_hour_timestamp = current_datetime.replace(minute=0, second=0, microsecond=0)
+            # Get the minute and round it down to the nearest 15th minute interval
+            current_minute = current_datetime.minute
+            rounded_minute = (current_minute // 15) * 15
+            current_start_hour_timestamp = current_datetime.replace(minute=rounded_minute, second=0, microsecond=0)
             start_timestamp = current_start_hour_timestamp - timedelta(hours=1)
             end_timestamp = current_start_hour_timestamp
-
-
+        
+        print('start_timestamp', start_timestamp.strftime('%Y-%m-%d %H:%M:%S'), 'end_timestamp', end_timestamp.strftime('%Y-%m-%d %H:%M:%S'))
         page_index = 1
         error_count = 0
         while True:
             try:
                 leadsquare_response = requests.post(
-                    url=f'{request_host}/LeadManagement.svc/Leads.RecentlyModified',
+                    url=f'{request_host}/v2/LeadManagement.svc/Leads.RecentlyModified',
                     params={
                         "accessKey": access_key,
                         "secretKey": secret_key,
@@ -254,7 +262,7 @@ class SourceLeadsquareLeads(Source):
                         },
                         "Paging": {
                             "PageIndex": page_index,
-                            "PageSize": 5000
+                            "PageSize": 1000
                         },
                         "Sorting": {
                             "ColumnName": "ModifiedOn",
@@ -271,7 +279,7 @@ class SourceLeadsquareLeads(Source):
                     leadsquare_leads = leadsquare_response_json['Leads']
                     for leadsquare_lead in leadsquare_leads:
                         lead_data = {
-                            lead_property: self.get_lead_property_from_leadsquare_lead(lead_property, leadsquare_lead) 
+                            lead_property if lead_property!= 'ProspectID' else 'ProspectId' : self.get_lead_property_from_leadsquare_lead(lead_property, leadsquare_lead) 
                             for lead_property in self.required_fields
                         }
                         yield AirbyteMessage(
