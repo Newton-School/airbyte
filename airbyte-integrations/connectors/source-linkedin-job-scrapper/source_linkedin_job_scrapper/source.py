@@ -47,7 +47,8 @@ chrome_options.add_argument('--disable-extensions')
 driver = webdriver.Chrome(executable_path=os.getenv("CHROME_DRIVER_PATH"), options=chrome_options)
 job_type_keys = {
     "full_time": "F",
-    "part_time": "P"
+    "part_time": "P",
+    "internship": "I",
 }
 past_time_keys = {
     "second": "r60",
@@ -55,7 +56,7 @@ past_time_keys = {
     "week": "r604800",
     "month": "r2592000"
 }
-job_level_keys = {
+experience_level_keys = {
     "internship": 1,
     "entry_level": 2,
     "associate": 3,
@@ -137,8 +138,14 @@ class SourceLinkedinJobScrapper(Source):
         except:
             return 1
 
-    def get_all_jobs_jd_links(self, job_role="Software%20Engineer", location="India", job_type="full_time", past_time="day",
-                              job_level="entry_level"):
+    def get_all_jobs_jd_links(
+            self, 
+            job_role="Software%20Engineer", 
+            location="India", 
+            job_type="full_time", 
+            past_time="day",
+            experience_level="entry_level"
+        ):
         jd_links = set()
         job_search_base_url = "https://www.linkedin.com/jobs/search?"
         final_url = job_search_base_url
@@ -147,19 +154,16 @@ class SourceLinkedinJobScrapper(Source):
             "location": location,
             "f_JT": job_type_keys[job_type],
             "f_TPR": past_time_keys[past_time],
-            "f_E": job_level_keys[job_level]
         }
-
+        if experience_level:
+            payload["f_E"] = experience_level_keys[experience_level]
         for key, val in payload.items():
             final_url += f"{key}={val}&"
-        scroll_times = self.get_scroll_time_count(final_url, tag_name='span', class_name="results-context-header__job-count",
-                                                  denominator=25)
+        scroll_times = self.get_scroll_time_count(final_url, tag_name='span', class_name="results-context-header__job-count", denominator=25)
         html = self.infinite_scroll(final_url, scroll_times, button_class_name="infinite-scroller__show-more-button--visible")
-
         soup = BeautifulSoup(html, 'html.parser')
         ul_tag = soup.find("ul", class_="jobs-search__results-list")
         li_tags = ul_tag.find_all("li")
-
         for li in li_tags:
             a_tags = li.find_all("a")
             for a in a_tags:
@@ -168,7 +172,12 @@ class SourceLinkedinJobScrapper(Source):
         return jd_links
 
     @staticmethod
-    def create_open_ai_query(input_query, OPENAI_API_KEY, model_engine='gpt-3.5-turbo', temperature=0):
+    def create_open_ai_query(
+        input_query, 
+        OPENAI_API_KEY, 
+        model_engine='gpt-4o-mini', 
+        temperature=0
+    ):
         openai_url = f"https://api.openai.com/v1/chat/completions"
         headers = {'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json'}
         payload = {
@@ -190,7 +199,12 @@ class SourceLinkedinJobScrapper(Source):
         evaluation_json = eval(text_response)
         return evaluation_json
 
-    def extract_additional_details_from_job_text(self, jd_text, open_ai_key, model_engine='gpt-3.5-turbo'):
+    def extract_additional_details_from_job_text(
+            self, 
+            jd_text, 
+            open_ai_key, 
+            model_engine='gpt-4o-mini'
+        ):
         prompt = "extract these details from the following text and just provide a JSON in this format" \
                  "{'skills': {'preferredSkills': []}, 'min_ctc': , 'max_ctc': , 'min_experience': , 'max_experience': , 'hr_name': '', 'department': }" \
                  "put maximum 5 items inside preferredSkills and those skills should be keywords only." \
@@ -260,8 +274,6 @@ class SourceLinkedinJobScrapper(Source):
                          "Tech Customer Support Engineer", "Technical Support Engineer", "Servicenow Developer", "SharePoint Developer",
                          "Shopify Developer", "Unity Game Developer", "WordPress & Shopify Developer", "WordPress Developer",
                          "Wordpress Web Developer", "Unreal Developer"]
-            for id, jr in enumerate(job_roles):
-                job_roles[id] = jr.replace(" ", "%20")
         elif config_role == 'Analyst':
             job_roles = [
                 "Analyst",
@@ -506,8 +518,21 @@ class SourceLinkedinJobScrapper(Source):
                 "Website Analysis",
                 "zoho analytics",
             ]
+        elif config_role == 'nst-internship':
+            job_roles = [
+                "Software Intern",
+                "Software Development Intern",
+                "SDE Intern",
+                "Fullstack",
+                "Frontend",
+                "Backend",
+                "Web Development Intern",
+                ]
         else:
             job_roles = [config_role]
+        
+        for id, jr in enumerate(job_roles):
+            job_roles[id] = jr.replace(" ", "%20")
 
         for job_role in job_roles:
             self.driver = webdriver.Chrome(executable_path=os.getenv("CHROME_DRIVER_PATH"), options=chrome_options)
@@ -518,10 +543,19 @@ class SourceLinkedinJobScrapper(Source):
                 record=AirbyteRecordMessage(stream='job_roles', data=job_role_data, emitted_at=int(datetime.now().timestamp()) * 1000),
             )
             try:
-                jd_links = self.get_all_jobs_jd_links(job_role=job_role)
+                if 'internship' in config_role:
+                    jd_links = self.get_all_jobs_jd_links(
+                        job_role=job_role, 
+                        job_type='internship',
+                        experience_level='internship',
+                        past_time='week'
+                    )
+                else:
+                    jd_links = self.get_all_jobs_jd_links(job_role=job_role)
             except Exception as e:
                 logger.info("failed jd link", job_role, str(e))
                 jd_links = []
+            print(job_role, len(jd_links), jd_links)
             for jd_link in jd_links:
                 job_details = {
                     'job_description_url': jd_link,
@@ -530,17 +564,17 @@ class SourceLinkedinJobScrapper(Source):
                     'job_source': 'linkedin',
                     'job_type': 'full-time'
                 }
+                if 'internship' in config_role:
+                    job_details['job_source'] = 'linkedin-internship'
+                    job_details['job_type'] = 'internship'
                 try:
                     jd_link = jd_link.replace("https://in.", "https://www.")
                     soup = self.create_soup(jd_link)
                     company_details = {}
-
                     hr_name = self.get_hiring_team(soup)
-
                     h1_tag = soup.find("h1", class_="top-card-layout__title")
                     if h1_tag:
                         job_details['job_title'] = h1_tag.text
-
                     company_span_tags = soup.find_all("span", class_=lambda x: x and "topcard__flavor" in x.split())
                     for span in company_span_tags:
                         a_tag = span.find("a")
@@ -581,12 +615,17 @@ class SourceLinkedinJobScrapper(Source):
 
                     job_details['company'] = company_details['name']
 
-                    ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
-                                                                                config['open_ai_api_key'])
+                    ai_response = self.extract_additional_details_from_job_text(
+                        job_details['job_description_raw_text'],
+                        config['open_ai_api_key']
+                    )
                     if 'skills' not in ai_response:
                         logger.info('skills not found')
-                        ai_response = self.extract_additional_details_from_job_text(job_details['job_description_raw_text'],
-                                                                                    config['open_ai_api_key'], model_engine='gpt-4')
+                        ai_response = self.extract_additional_details_from_job_text(
+                            job_details['job_description_raw_text'],
+                            config['open_ai_api_key'], 
+                            model_engine='gpt-4o'
+                        )
                     job_details = job_details | ai_response
                     yield AirbyteMessage(
                         type=Type.RECORD,
