@@ -82,7 +82,7 @@ class SourceLeadsquareUsers(Source):
             "lastName": {
                 "type": "string"
             },
-            "EmailAddress": {
+            "emailAddress": {
                 "type": "string"
             },
             "role": {
