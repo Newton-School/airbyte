@@ -92,7 +92,8 @@ class SourceLeadsquareLeads(Source):
         "mx_Prospect_Status",
         "mx_Reactivation_Source",
         "mx_Lead_Status",
-        "mx_PMM_Identifier"
+        "mx_PMM_Identifier",
+        "OwnerId"
     ]
 
     def get_stream_fields(self):
