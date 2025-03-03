@@ -85,7 +85,14 @@ class SourceLeadsquareLeads(Source):
         "mx_Lead_Quality_Grade",
         "mx_Lead_Inherent_Intent",
         "mx_Test_Date_n_Time",
-        "mx_Lead_Type"
+        "mx_Lead_Type",
+        "Source",
+        "mx_Phoenix_Identifer",
+        "mx_Phoenix_Lead_Assigned_Date",
+        "mx_Prospect_Status",
+        "mx_Reactivation_Source",
+        "mx_Lead_Status",
+        "mx_PMM_Identifier"
     ]
 
     def get_stream_fields(self):
