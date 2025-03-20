@@ -86,7 +86,7 @@ class SourceLeadsquareLeads(Source):
         "mx_Lead_Inherent_Intent",
         "mx_Test_Date_n_Time",
         "mx_Lead_Type",
-        "Source"
+        "mx_Phoenix_Identifer",
     ]
 
     def get_stream_fields(self):
